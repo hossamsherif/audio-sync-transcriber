@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browser Whisper Sync Player</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #172042;
+      --text: #eef2ff;
+      --muted: #a7b0d8;
+      --accent: #7aa2ff;
+      --line: #263159;
+      --active: #243364;
+      --success: #9bffcf;
+      --error: #ff8d8d;
+      --warning: #ffd37a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #10162b 100%);
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.15; }
+    .sub { margin: 0 0 20px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
+    .card {
+      background: rgba(18, 25, 51, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+    .card-head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .card-head h2 { margin: 0; font-size: 16px; }
+    .card-body { padding: 16px 18px; }
+    .row { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #d8e0ff; }
+    input[type="file"], input[type="text"], select, textarea, input[type="number"] {
+      width: 100%; background: var(--panel-2); border: 1px solid #32406f; color: var(--text);
+      border-radius: 12px; padding: 10px 12px; font: inherit;
+    }
+    button {
+      border: 0; background: var(--accent); color: #081127; padding: 10px 14px; border-radius: 999px;
+      font: inherit; font-weight: 700; cursor: pointer; transition: transform .14s ease, opacity .14s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    button.secondary { background: #1d2852; color: var(--text); border: 1px solid #314172; }
+    .btns { display: flex; flex-wrap: wrap; gap: 10px; }
+    .hint, .error, .success, .warning { font-size: 13px; line-height: 1.45; margin-top: 8px; }
+    .hint { color: var(--muted); }
+    .error { color: var(--error); }
+    .success { color: var(--success); }
+    .warning { color: var(--warning); }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 6px 10px; border-radius: 999px; background: #1d2852; color: var(--muted);
+      border: 1px solid #30406d; font-size: 12px;
+    }
+    .status-box {
+      border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+      background: rgba(255,255,255,.02); margin-top: 10px;
+    }
+    progress { width: 100%; height: 10px; margin-top: 8px; }
+    audio { width: 100%; margin-bottom: 16px; }
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .toolbar input[type="text"] { flex: 1 1 220px; }
+    .transcript {
+      max-height: 66vh; overflow: auto; border: 1px solid var(--line); border-radius: 16px;
+      background: rgba(255,255,255,.02);
+    }
+    .segment {
+      padding: 14px 16px; border-bottom: 1px solid rgba(49, 64, 109, .8); cursor: pointer;
+      transition: background .16s ease, outline-color .16s ease;
+    }
+    .segment:last-child { border-bottom: 0; }
+    .segment:hover { background: rgba(255,255,255,.03); }
+    .segment.active { background: var(--active); outline: 1px solid #8fb0ff; }
+    .segment-time { color: #9bffcf; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+    .segment-text { color: var(--text); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .segment-text mark { background: rgba(122,162,255,.28); color: var(--text); padding: .08em .16em; border-radius: .3em; }
+    .empty { padding: 30px 18px; text-align: center; color: var(--muted); line-height: 1.5; }
+    .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .smallnote { font-size: 12px; color: var(--muted); }
+    .inline-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .transcript { max-height: none; }
+      .twocol { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Browser Transcriber + Sync Player</h1>
+    <p class="sub">This version avoids the broken quantized ONNX path by loading Whisper in full precision by default. It transcribes in your browser, then syncs and highlights the transcript while audio plays.</p>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card-head"><h2>Transcribe</h2></div>
+        <div class="card-body">
+          <div class="row">
+            <label for="audioFile">Audio file</label>
+            <input id="audioFile" type="file" />
+          </div>
+
+          <div class="row">
+            <label for="modelSelect">Model</label>
+            <select id="modelSelect">
+              <option value="onnx-community/whisper-tiny.en_timestamped">onnx-community/whisper-tiny.en_timestamped — safest for word timestamps</option>
+              <option value="Xenova/whisper-tiny.en">Xenova/whisper-tiny.en — smallest stable option</option>
+              <option value="onnx-community/whisper-base.en">onnx-community/whisper-base.en — better quality, heavier</option>
+            </select>
+            <div class="hint">The first run downloads the model into browser cache.</div>
+          </div>
+
+          <div class="row twocol">
+            <div>
+              <label for="deviceSelect">Device</label>
+              <select id="deviceSelect">
+                <option value="auto">auto</option>
+                <option value="webgpu">webgpu</option>
+                <option value="wasm">wasm</option>
+              </select>
+            </div>
+            <div>
+              <label for="dtypeSelect">Weights</label>
+              <select id="dtypeSelect">
+                <option value="fp32">fp32 (recommended)</option>
+                <option value="q8">q8 (smaller, may fail)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row twocol">
+            <div>
+              <label for="chunkLength">Chunk length (seconds)</label>
+              <input id="chunkLength" type="number" min="10" max="60" step="1" value="29" />
+            </div>
+            <div>
+              <label for="strideLength">Stride (seconds)</label>
+              <input id="strideLength" type="number" min="1" max="10" step="1" value="5" />
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="timestampMode">Timestamps</label>
+            <select id="timestampMode">
+              <option value="word">word</option>
+              <option value="segment">segment</option>
+            </select>
+            <div class="smallnote">Word timestamps are more precise but heavier.</div>
+          </div>
+
+          <div class="row btns">
+            <button id="transcribeBtn" type="button">Transcribe in browser</button>
+            <button id="resetBtn" class="secondary" type="button">Reset</button>
+          </div>
+
+          <div class="row btns">
+            <button id="downloadJsonBtn" class="secondary" type="button" disabled>Download JSON</button>
+            <button id="downloadSrtBtn" class="secondary" type="button" disabled>Download SRT</button>
+            <button id="downloadVttBtn" class="secondary" type="button" disabled>Download VTT</button>
+            <button id="downloadTxtBtn" class="secondary" type="button" disabled>Download TXT</button>
+          </div>
+
+          <div class="status-box">
+            <div id="status" class="hint">Choose an audio file to begin.</div>
+            <progress id="progressBar" max="100" value="0"></progress>
+            <div id="progressLabel" class="hint">Idle</div>
+            <div id="error" class="error"></div>
+            <div id="success" class="success"></div>
+            <div id="warning" class="warning"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Player + Transcript</h2></div>
+        <div class="card-body">
+          <div class="chips" style="margin-bottom: 12px;">
+            <div class="chip" id="audioLabel">Audio: none</div>
+            <div class="chip" id="modelLabel">Model: none</div>
+            <div class="chip" id="countLabel">0 segments</div>
+            <div class="chip" id="timeLabel">00:00 / 00:00</div>
+          </div>
+
+          <audio id="audio" controls preload="metadata"></audio>
+
+          <div class="toolbar">
+            <input id="searchBox" type="text" placeholder="Search transcript text" />
+            <label class="inline-toggle"><input id="autoscrollToggle" type="checkbox" checked /> auto-scroll</label>
+          </div>
+
+          <div id="transcript" class="transcript">
+            <div class="empty">Transcribe an audio file to generate a synced transcript here.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+
+    env.allowRemoteModels = true;
+    env.useBrowserCache = true;
+    env.allowLocalModels = false;
+    if (env.backends?.onnx?.wasm) {
+      env.backends.onnx.wasm.numThreads = 1;
+      env.backends.onnx.wasm.simd = true;
+    }
+
+    const TARGET_SAMPLE_RATE = 16000;
+
+    const audioEl = document.getElementById('audio');
+    const audioFileEl = document.getElementById('audioFile');
+    const modelSelectEl = document.getElementById('modelSelect');
+    const deviceSelectEl = document.getElementById('deviceSelect');
+    const dtypeSelectEl = document.getElementById('dtypeSelect');
+    const chunkLengthEl = document.getElementById('chunkLength');
+    const strideLengthEl = document.getElementById('strideLength');
+    const timestampModeEl = document.getElementById('timestampMode');
+    const transcribeBtn = document.getElementById('transcribeBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+    const downloadSrtBtn = document.getElementById('downloadSrtBtn');
+    const downloadVttBtn = document.getElementById('downloadVttBtn');
+    const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+    const transcriptEl = document.getElementById('transcript');
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+    const successEl = document.getElementById('success');
+    const warningEl = document.getElementById('warning');
+    const progressBarEl = document.getElementById('progressBar');
+    const progressLabelEl = document.getElementById('progressLabel');
+    const audioLabelEl = document.getElementById('audioLabel');
+    const modelLabelEl = document.getElementById('modelLabel');
+    const countLabelEl = document.getElementById('countLabel');
+    const timeLabelEl = document.getElementById('timeLabel');
+    const searchBoxEl = document.getElementById('searchBox');
+    const autoscrollToggleEl = document.getElementById('autoscrollToggle');
+
+    let audioObjectUrl = null;
+    let segments = [];
+    let filteredSegments = [];
+    let segmentNodes = [];
+    let activeIndex = -1;
+    let transcriber = null;
+    let currentKey = null;
+    let jobNonce = 0;
+
+    function setStatus(message) { statusEl.textContent = message; }
+    function setError(message = '') { errorEl.textContent = message; }
+    function setSuccess(message = '') { successEl.textContent = message; }
+    function setWarning(message = '') { warningEl.textContent = message; }
+    function setProgress(percent, label) {
+      if (Number.isFinite(percent)) progressBarEl.value = Math.max(0, Math.min(100, percent));
+      if (label) progressLabelEl.textContent = label;
+    }
+    function setIdleProgress(label = 'Idle') { progressBarEl.value = 0; progressLabelEl.textContent = label; }
+    function setBusy(busy) {
+      transcribeBtn.disabled = busy;
+      audioFileEl.disabled = busy;
+      modelSelectEl.disabled = busy;
+      deviceSelectEl.disabled = busy;
+      dtypeSelectEl.disabled = busy;
+      chunkLengthEl.disabled = busy;
+      strideLengthEl.disabled = busy;
+      timestampModeEl.disabled = busy;
+    }
+    function formatTime(totalSeconds, includeMillis = false, srt = false) {
+      const safe = Math.max(0, Number(totalSeconds) || 0);
+      const hours = Math.floor(safe / 3600);
+      const minutes = Math.floor((safe % 3600) / 60);
+      const seconds = Math.floor(safe % 60);
+      const millis = Math.round((safe - Math.floor(safe)) * 1000);
+      const hh = String(hours).padStart(2, '0');
+      const mm = String(minutes).padStart(2, '0');
+      const ss = String(seconds).padStart(2, '0');
+      return includeMillis
+        ? `${hh}:${mm}:${ss}${srt ? ',' : '.'}${String(millis).padStart(3, '0')}`
+        : `${hh}:${mm}:${ss}`;
+    }
+    function updateClock(current, duration) {
+      timeLabelEl.textContent = `${formatTime(current || 0)} / ${formatTime(duration || 0)}`;
+    }
+    function pickDevice() {
+      if (deviceSelectEl.value !== 'auto') return deviceSelectEl.value;
+      return navigator.gpu ? 'webgpu' : 'wasm';
+    }
+    function escapeHtml(value) {
+      return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+    function highlightMatch(text, query) {
+      if (!query) return escapeHtml(text);
+      const safe = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return escapeHtml(text).replace(new RegExp(safe, 'ig'), m => `<mark>${m}</mark>`);
+    }
+    function averageChannels(audioBuffer) {
+      if (audioBuffer.numberOfChannels === 1) return Float32Array.from(audioBuffer.getChannelData(0));
+      const length = audioBuffer.length;
+      const channels = Array.from({ length: audioBuffer.numberOfChannels }, (_, i) => audioBuffer.getChannelData(i));
+      const mixed = new Float32Array(length);
+      for (let i = 0; i < length; i++) {
+        let sum = 0;
+        for (const channel of channels) sum += channel[i];
+        mixed[i] = sum / channels.length;
+      }
+      return mixed;
+    }
+    function resampleLinear(samples, sourceRate, targetRate) {
+      if (sourceRate === targetRate) return Float32Array.from(samples);
+      const ratio = sourceRate / targetRate;
+      const newLength = Math.max(1, Math.round(samples.length / ratio));
+      const output = new Float32Array(newLength);
+      for (let i = 0; i < newLength; i++) {
+        const position = i * ratio;
+        const left = Math.floor(position);
+        const right = Math.min(left + 1, samples.length - 1);
+        const frac = position - left;
+        output[i] = samples[left] * (1 - frac) + samples[right] * frac;
+      }
+      return output;
+    }
+    async function decodeAudioFile(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) throw new Error('This browser does not support the Web Audio API.');
+      const context = new AudioContextClass();
+      try {
+        const decoded = await context.decodeAudioData(arrayBuffer.slice(0));
+        const mono = averageChannels(decoded);
+        return resampleLinear(mono, decoded.sampleRate, TARGET_SAMPLE_RATE);
+      } finally {
+        try { await context.close(); } catch (_) {}
+      }
+    }
+    function normalizeSegments(rawSegments) {
+      const normalized = rawSegments
+        .map(seg => ({
+          start: Number(seg.start),
+          end: seg.end == null ? null : Number(seg.end),
+          text: String(seg.text || '').trim(),
+        }))
+        .filter(seg => Number.isFinite(seg.start) && seg.text)
+        .sort((a, b) => a.start - b.start);
+
+      return normalized.map((seg, idx, arr) => {
+        let end = seg.end;
+        const nextStart = arr[idx + 1]?.start;
+        if (!(Number.isFinite(end) && end > seg.start)) {
+          if (Number.isFinite(nextStart) && nextStart > seg.start) end = nextStart;
+          else if (Number.isFinite(audioEl.duration) && audioEl.duration > seg.start) end = audioEl.duration;
+          else end = seg.start + 2;
+        }
+        return { ...seg, end };
+      });
+    }
+    function groupWordChunks(chunks) {
+      const rows = [];
+      let current = null;
+      let count = 0;
+      for (const chunk of chunks) {
+        const [start, end] = Array.isArray(chunk.timestamp) ? chunk.timestamp : [null, null];
+        const text = String(chunk.text || '').trim();
+        if (!Number.isFinite(start) || !text) continue;
+        if (!current) {
+          current = { start, end: Number.isFinite(end) ? end : start + 0.8, text };
+          count = 1;
+          continue;
+        }
+        current.end = Number.isFinite(end) ? end : current.end;
+        current.text += (text.startsWith("'") || text.startsWith(',') || text.startsWith('.') || text.startsWith('!') || text.startsWith('?') ? '' : ' ') + text;
+        count += 1;
+        const duration = current.end - current.start;
+        const shouldBreak = /[.!?…:]$/.test(text) || duration >= 6 || count >= 14;
+        if (shouldBreak) {
+          rows.push(current);
+          current = null;
+          count = 0;
+        }
+      }
+      if (current) rows.push(current);
+      return rows;
+    }
+    function outputToSegments(output, timestampMode) {
+      if (Array.isArray(output?.chunks) && output.chunks.length) {
+        if (timestampMode === 'word') {
+          return normalizeSegments(groupWordChunks(output.chunks));
+        }
+        return normalizeSegments(output.chunks.map(chunk => ({
+          start: Array.isArray(chunk.timestamp) ? chunk.timestamp[0] : 0,
+          end: Array.isArray(chunk.timestamp) ? chunk.timestamp[1] : null,
+          text: chunk.text,
+        })));
+      }
+      if (typeof output?.text === 'string' && output.text.trim()) {
+        return normalizeSegments([{ start: 0, end: audioEl.duration || 0, text: output.text.trim() }]);
+      }
+      return [];
+    }
+    async function getTranscriber() {
+      const model = modelSelectEl.value;
+      const device = pickDevice();
+      const dtype = dtypeSelectEl.value;
+      const key = `${model}__${device}__${dtype}`;
+      if (transcriber && currentKey === key) return transcriber;
+      setStatus(`Loading ${model} on ${device} (${dtype})...`);
+      setProgress(0, 'Starting model download...');
+      transcriber = await pipeline('automatic-speech-recognition', model, {
+        device,
+        dtype,
+        progress_callback: (info) => {
+          if (info?.status === 'progress' && Number.isFinite(info.progress)) {
+            setProgress(info.progress, `Downloading ${info.file || 'model'} — ${Math.round(info.progress)}%`);
+          } else if (info?.status === 'done') {
+            setProgress(100, 'Model ready');
+          } else if (info?.status) {
+            progressLabelEl.textContent = `${info.status}${info.file ? ` — ${info.file}` : ''}`;
+          }
+        },
+      });
+      currentKey = key;
+      return transcriber;
+    }
+    function renderTranscript() {
+      const query = searchBoxEl.value.trim().toLowerCase();
+      filteredSegments = query ? segments.filter(seg => seg.text.toLowerCase().includes(query)) : [...segments];
+      countLabelEl.textContent = `${filteredSegments.length} segment${filteredSegments.length === 1 ? '' : 's'}`;
+      if (!filteredSegments.length) {
+        transcriptEl.innerHTML = `<div class="empty">${segments.length ? 'No matching lines.' : 'Transcribe an audio file to generate a synced transcript here.'}</div>`;
+        segmentNodes = [];
+        activeIndex = -1;
+        return;
+      }
+      transcriptEl.innerHTML = '';
+      const rawQuery = searchBoxEl.value.trim();
+      segmentNodes = filteredSegments.map((seg, index) => {
+        const node = document.createElement('div');
+        node.className = 'segment';
+        node.innerHTML = `
+          <div class="segment-time">${formatTime(seg.start)} → ${formatTime(seg.end)}</div>
+          <div class="segment-text">${highlightMatch(seg.text, rawQuery)}</div>
+        `;
+        node.addEventListener('click', () => {
+          audioEl.currentTime = seg.start;
+          audioEl.play().catch(() => {});
+          updateActiveSegment();
+        });
+        transcriptEl.appendChild(node);
+        return node;
+      });
+      updateActiveSegment();
+    }
+    function findActiveSegmentIndex(time) {
+      for (let i = 0; i < filteredSegments.length; i++) {
+        const seg = filteredSegments[i];
+        if (time >= seg.start && time < seg.end) return i;
+      }
+      if (filteredSegments.length && time >= filteredSegments[filteredSegments.length - 1].start) return filteredSegments.length - 1;
+      return -1;
+    }
+    function updateActiveSegment() {
+      if (!segmentNodes.length) return;
+      const nextActive = findActiveSegmentIndex(audioEl.currentTime || 0);
+      if (nextActive === activeIndex) return;
+      if (activeIndex >= 0 && segmentNodes[activeIndex]) segmentNodes[activeIndex].classList.remove('active');
+      activeIndex = nextActive;
+      if (activeIndex >= 0 && segmentNodes[activeIndex]) {
+        segmentNodes[activeIndex].classList.add('active');
+        if (autoscrollToggleEl.checked) segmentNodes[activeIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+    function setTranscriptData(nextSegments) {
+      segments = normalizeSegments(nextSegments);
+      renderTranscript();
+      const ready = segments.length > 0;
+      downloadJsonBtn.disabled = !ready;
+      downloadSrtBtn.disabled = !ready;
+      downloadVttBtn.disabled = !ready;
+      downloadTxtBtn.disabled = !ready;
+    }
+    function download(content, filename, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function toJson() { return JSON.stringify({ text: segments.map(s => s.text).join(' ').trim(), segments }, null, 2); }
+    function toTxt() { return segments.map(seg => `[${formatTime(seg.start)}] ${seg.text}`).join('\n'); }
+    function toSrt() {
+      return segments.map((seg, index) => [
+        String(index + 1),
+        `${formatTime(seg.start, true, true)} --> ${formatTime(seg.end, true, true)}`,
+        seg.text,
+      ].join('\n')).join('\n\n');
+    }
+    function toVtt() {
+      const body = segments.map(seg => `${formatTime(seg.start, true)} --> ${formatTime(seg.end, true)}\n${seg.text}`).join('\n\n');
+      return `WEBVTT\n\n${body}`;
+    }
+    async function transcribeAudio() {
+      const file = audioFileEl.files?.[0];
+      if (!file) {
+        setError('Choose an audio file first.');
+        return;
+      }
+      const localJob = ++jobNonce;
+      const model = modelSelectEl.value;
+      const device = pickDevice();
+      const dtype = dtypeSelectEl.value;
+      const chunkLength = Math.max(10, Number(chunkLengthEl.value) || 29);
+      const strideLength = Math.max(1, Number(strideLengthEl.value) || 5);
+      const timestampMode = timestampModeEl.value;
+
+      setBusy(true);
+      setError('');
+      setSuccess('');
+      setWarning('');
+      setStatus('Preparing audio...');
+      setProgress(0, 'Decoding audio...');
+      modelLabelEl.textContent = `Model: ${model.split('/').pop()} | ${device} | ${dtype}`;
+
+      try {
+        const audioData = await decodeAudioFile(file);
+        if (localJob !== jobNonce) return;
+
+        if (dtype !== 'fp32') {
+          setWarning('Quantized weights can still fail in some browsers. If session creation fails, switch back to fp32.');
+        }
+
+        const asr = await getTranscriber();
+        if (localJob !== jobNonce) return;
+
+        setStatus('Running transcription...');
+        setProgress(0, 'Transcribing audio...');
+        const output = await asr(audioData, {
+          chunk_length_s: chunkLength,
+          stride_length_s: strideLength,
+          return_timestamps: timestampMode === 'word' ? 'word' : true,
+        });
+        if (localJob !== jobNonce) return;
+
+        const nextSegments = outputToSegments(output, timestampMode);
+        if (!nextSegments.length) throw new Error('Transcription finished, but no timestamped segments were returned.');
+
+        setTranscriptData(nextSegments);
+        setProgress(100, 'Done');
+        setStatus(`Transcript ready with ${nextSegments.length} segments.`);
+        setSuccess('Transcription completed. Play the audio or click any line to jump.');
+      } catch (error) {
+        if (localJob !== jobNonce) return;
+        console.error(error);
+        const message = error?.message || 'Transcription failed.';
+        setError(message);
+        if (/Missing required scale|TransposeDQWeightsForMatMulNBits|Can't create a session/i.test(message)) {
+          setWarning('This usually means a quantized ONNX model path was selected by the browser runtime. Use fp32 and try tiny.en_timestamped on wasm or webgpu.');
+        }
+        setStatus('Transcription did not complete.');
+        setIdleProgress('Failed');
+      } finally {
+        if (localJob === jobNonce) setBusy(false);
+      }
+    }
+    function resetAll() {
+      jobNonce += 1;
+      setBusy(false);
+      setIdleProgress('Idle');
+      setStatus('Reset.');
+      setError('');
+      setSuccess('');
+      setWarning('');
+      segments = [];
+      renderTranscript();
+      downloadJsonBtn.disabled = true;
+      downloadSrtBtn.disabled = true;
+      downloadVttBtn.disabled = true;
+      downloadTxtBtn.disabled = true;
+    }
+
+    audioFileEl.addEventListener('change', () => {
+      const file = audioFileEl.files?.[0];
+      if (!file) return;
+      if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
+      audioObjectUrl = URL.createObjectURL(file);
+      audioEl.src = audioObjectUrl;
+      audioLabelEl.textContent = `Audio: ${file.name}`;
+      setStatus(`Loaded audio: ${file.name}`);
+      setError('');
+      setSuccess('');
+      setWarning('');
+      modelLabelEl.textContent = `Model: ${modelSelectEl.value.split('/').pop()}`;
+    });
+
+    transcribeBtn.addEventListener('click', transcribeAudio);
+    resetBtn.addEventListener('click', resetAll);
+    searchBoxEl.addEventListener('input', renderTranscript);
+    audioEl.addEventListener('timeupdate', () => { updateClock(audioEl.currentTime, audioEl.duration); updateActiveSegment(); });
+    audioEl.addEventListener('loadedmetadata', () => updateClock(audioEl.currentTime, audioEl.duration));
+    audioEl.addEventListener('seeked', updateActiveSegment);
+
+    downloadJsonBtn.addEventListener('click', () => download(toJson(), 'transcript.json', 'application/json'));
+    downloadSrtBtn.addEventListener('click', () => download(toSrt(), 'transcript.srt', 'text/plain'));
+    downloadVttBtn.addEventListener('click', () => download(toVtt(), 'transcript.vtt', 'text/vtt'));
+    downloadTxtBtn.addEventListener('click', () => download(toTxt(), 'transcript.txt', 'text/plain'));
+
+    updateClock(0, 0);
+    setIdleProgress('Idle');
+  </script>
+</body>
+</html>
