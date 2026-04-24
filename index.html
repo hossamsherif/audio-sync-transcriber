@@ -542,7 +542,9 @@
     function updateActiveSegment() {
       if (!segmentNodes.length) return;
       const nextActive = findActiveSegmentIndex(audioEl.currentTime || 0);
-      if (nextActive === activeIndex) return;
+      if (nextActive === activeIndex) {
+        if (activeIndex >= 0 && segmentNodes[activeIndex]?.classList.contains('active')) return;
+      }
       if (activeIndex >= 0 && segmentNodes[activeIndex]) segmentNodes[activeIndex].classList.remove('active');
       activeIndex = nextActive;
       if (activeIndex >= 0 && segmentNodes[activeIndex]) {
