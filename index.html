@@ -259,6 +259,8 @@
     let transcriber = null;
     let currentKey = null;
     let jobNonce = 0;
+    let streamActive = false;
+    let streamHorizonTime = 0;
 
     function setStatus(message) { statusEl.textContent = message; }
     function setError(message = '') { errorEl.textContent = message; }
@@ -521,6 +523,19 @@
       ) {
         return lastBefore;
       }
+      if (streamActive && time <= streamHorizonTime + ACTIVE_SEGMENT_HOLD_SECONDS) {
+        if (activeIndex >= 0) {
+          return Math.min(filteredSegments.length - 1, activeIndex);
+        }
+      }
+      if (
+        streamActive &&
+        activeIndex < 0 &&
+        filteredSegments.length &&
+        time < filteredSegments[0].start
+      ) {
+        return -1;
+      }
       if (filteredSegments.length && time >= filteredSegments[filteredSegments.length - 1].start) return filteredSegments.length - 1;
       return -1;
     }
@@ -666,6 +681,8 @@
         const chunkWindows = getChunkWindows(audioData.length, chunkLength, strideLength);
         const totalChunks = Math.max(1, chunkWindows.length);
         let failedChunks = 0;
+        streamActive = true;
+        streamHorizonTime = 0;
         segments = [];
         renderTranscript();
         for (let i = 0; i < totalChunks; i++) {
@@ -677,6 +694,7 @@
             windowStartSec,
             chunkAudio,
           } = chunkWindows[i];
+          streamHorizonTime = Math.max(streamHorizonTime, centralEnd);
           try {
             const windowData = chunkAudio(audioData);
             const output = await asr(windowData, {
@@ -721,6 +739,8 @@
         setStatus('Transcription did not complete.');
         setIdleProgress('Failed');
       } finally {
+        streamActive = false;
+        streamHorizonTime = 0;
         if (localJob === jobNonce) setBusy(false);
       }
     }
