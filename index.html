@@ -218,6 +218,10 @@
     }
 
     const TARGET_SAMPLE_RATE = 16000;
+    const ACTIVE_SEGMENT_HOLD_SECONDS = 1.75;
+    const READABLE_SEGMENT_GAP_SEC = 0.42;
+    const READABLE_SEGMENT_MAX_DURATION_SEC = 9;
+    const READABLE_SEGMENT_MAX_TEXT_LEN = 280;
 
     const audioEl = document.getElementById('audio');
     const audioFileEl = document.getElementById('audioFile');
@@ -255,6 +259,8 @@
     let transcriber = null;
     let currentKey = null;
     let jobNonce = 0;
+    let streamActive = false;
+    let streamHorizonTime = 0;
 
     function setStatus(message) { statusEl.textContent = message; }
     function setError(message = '') { errorEl.textContent = message; }
@@ -411,6 +417,37 @@
       }
       return [];
     }
+    function mergeReadableSegments(rawSegments) {
+      const normalized = normalizeSegments(rawSegments);
+      if (!normalized.length) return [];
+      const merged = [ { ...normalized[0] } ];
+
+      for (let i = 1; i < normalized.length; i++) {
+        const seg = normalized[i];
+        const last = merged[merged.length - 1];
+        const gap = seg.start - last.end;
+        const combinedDuration = seg.end - last.start;
+        const trimmedLast = last.text.trim();
+        const sentenceBoundary = /[.!?…]$/.test(trimmedLast);
+        const mergedText = `${trimmedLast}${seg.text.startsWith("'") || seg.text.startsWith(',') || seg.text.startsWith('.') || seg.text.startsWith('!') || seg.text.startsWith('?') ? '' : ' '}${seg.text}`.trim();
+
+        const canMerge =
+          gap <= READABLE_SEGMENT_GAP_SEC &&
+          !sentenceBoundary &&
+          combinedDuration <= READABLE_SEGMENT_MAX_DURATION_SEC &&
+          mergedText.length <= READABLE_SEGMENT_MAX_TEXT_LEN;
+
+        if (canMerge) {
+          last.text = mergedText;
+          last.end = seg.end;
+          continue;
+        }
+
+        merged.push({ ...seg });
+      }
+
+      return merged;
+    }
     async function getTranscriber() {
       const model = modelSelectEl.value;
       const device = pickDevice();
@@ -465,9 +502,39 @@
       updateActiveSegment();
     }
     function findActiveSegmentIndex(time) {
+      if (!filteredSegments.length) return -1;
+      let lastBefore = -1;
       for (let i = 0; i < filteredSegments.length; i++) {
         const seg = filteredSegments[i];
-        if (time >= seg.start && time < seg.end) return i;
+        if (time >= seg.start && time <= seg.end) return i;
+        if (seg.start <= time) lastBefore = i;
+      }
+      if (
+        activeIndex >= 0 &&
+        activeIndex < filteredSegments.length &&
+        time >= filteredSegments[activeIndex].start &&
+        time <= filteredSegments[activeIndex].end + ACTIVE_SEGMENT_HOLD_SECONDS
+      ) {
+        return activeIndex;
+      }
+      if (
+        lastBefore >= 0 &&
+        time - filteredSegments[lastBefore].end <= ACTIVE_SEGMENT_HOLD_SECONDS
+      ) {
+        return lastBefore;
+      }
+      if (streamActive && time <= streamHorizonTime + ACTIVE_SEGMENT_HOLD_SECONDS) {
+        if (activeIndex >= 0) {
+          return Math.min(filteredSegments.length - 1, activeIndex);
+        }
+      }
+      if (
+        streamActive &&
+        activeIndex < 0 &&
+        filteredSegments.length &&
+        time < filteredSegments[0].start
+      ) {
+        return -1;
       }
       if (filteredSegments.length && time >= filteredSegments[filteredSegments.length - 1].start) return filteredSegments.length - 1;
       return -1;
@@ -475,7 +542,9 @@
     function updateActiveSegment() {
       if (!segmentNodes.length) return;
       const nextActive = findActiveSegmentIndex(audioEl.currentTime || 0);
-      if (nextActive === activeIndex) return;
+      if (nextActive === activeIndex) {
+        if (activeIndex >= 0 && segmentNodes[activeIndex]?.classList.contains('active')) return;
+      }
       if (activeIndex >= 0 && segmentNodes[activeIndex]) segmentNodes[activeIndex].classList.remove('active');
       activeIndex = nextActive;
       if (activeIndex >= 0 && segmentNodes[activeIndex]) {
@@ -484,13 +553,33 @@
       }
     }
     function setTranscriptData(nextSegments) {
-      segments = normalizeSegments(nextSegments);
+      segments = mergeReadableSegments(nextSegments);
       renderTranscript();
       const ready = segments.length > 0;
       downloadJsonBtn.disabled = !ready;
       downloadSrtBtn.disabled = !ready;
       downloadVttBtn.disabled = !ready;
       downloadTxtBtn.disabled = !ready;
+    }
+    function appendTranscriptData(nextSegments, chunkIndex, totalChunks) {
+      if (nextSegments.length) {
+        segments.push(...nextSegments);
+      }
+      if (!segments.length) {
+        segments = [];
+        setTranscriptData(segments);
+      } else {
+        segments = mergeReadableSegments(segments);
+        renderTranscript();
+      }
+      const ready = segments.length > 0;
+      downloadJsonBtn.disabled = !ready;
+      downloadSrtBtn.disabled = !ready;
+      downloadVttBtn.disabled = !ready;
+      downloadTxtBtn.disabled = !ready;
+      if (chunkIndex != null && totalChunks != null) {
+        setProgress(Math.round((chunkIndex / totalChunks) * 100), `Transcribing chunk ${chunkIndex} / ${totalChunks}`);
+      }
     }
     function download(content, filename, type) {
       const blob = new Blob([content], { type });
@@ -515,6 +604,46 @@
     function toVtt() {
       const body = segments.map(seg => `${formatTime(seg.start, true)} --> ${formatTime(seg.end, true)}\n${seg.text}`).join('\n\n');
       return `WEBVTT\n\n${body}`;
+    }
+    function getChunkWindows(totalSamples, chunkLengthSec, strideSec) {
+      const chunkSize = Math.max(1, Math.round(chunkLengthSec * TARGET_SAMPLE_RATE));
+      const overlap = Math.max(0, Math.round(strideSec * TARGET_SAMPLE_RATE));
+      const totalDuration = totalSamples / TARGET_SAMPLE_RATE;
+      const windows = [];
+      for (let start = 0; start < totalSamples; start += chunkSize) {
+        const centralStart = start / TARGET_SAMPLE_RATE;
+        const centralEnd = Math.min(totalDuration, centralStart + chunkLengthSec);
+        const windowStart = Math.max(0, Math.round(centralStart * TARGET_SAMPLE_RATE) - overlap);
+        const windowEnd = Math.min(
+          totalSamples,
+          Math.round(centralEnd * TARGET_SAMPLE_RATE) + overlap,
+        );
+        windows.push({
+          centralStart,
+          centralEnd,
+          windowStart,
+          windowStartSec: windowStart / TARGET_SAMPLE_RATE,
+          windowEndSec: windowEnd / TARGET_SAMPLE_RATE,
+          chunkAudio: audioData => audioData.slice(windowStart, windowEnd),
+        });
+      }
+      return windows;
+    }
+    function alignChunkSegments(rawSegments, windowStartSec, centralStart, centralEnd) {
+      return rawSegments
+        .map(seg => ({
+          start: seg.start + windowStartSec,
+          end: seg.end + windowStartSec,
+          text: seg.text,
+        }))
+        .filter(seg => Number.isFinite(seg.start) && Number.isFinite(seg.end))
+        .filter(seg => seg.end > centralStart && seg.start < centralEnd)
+        .map(seg => ({
+          ...seg,
+          start: Math.max(seg.start, centralStart),
+          end: Math.min(seg.end, centralEnd),
+        }))
+        .filter(seg => seg.end > seg.start && seg.text);
     }
     async function transcribeAudio() {
       const file = audioFileEl.files?.[0];
@@ -550,21 +679,57 @@
         if (localJob !== jobNonce) return;
 
         setStatus('Running transcription...');
-        setProgress(0, 'Transcribing audio...');
-        const output = await asr(audioData, {
-          chunk_length_s: chunkLength,
-          stride_length_s: strideLength,
-          return_timestamps: timestampMode === 'word' ? 'word' : true,
-        });
+        setProgress(0, 'Streaming chunks...');
+        const chunkWindows = getChunkWindows(audioData.length, chunkLength, strideLength);
+        const totalChunks = Math.max(1, chunkWindows.length);
+        let failedChunks = 0;
+        streamActive = true;
+        streamHorizonTime = 0;
+        segments = [];
+        renderTranscript();
+        for (let i = 0; i < totalChunks; i++) {
+          if (localJob !== jobNonce) return;
+          const {
+            centralStart,
+            centralEnd,
+            windowStart,
+            windowStartSec,
+            chunkAudio,
+          } = chunkWindows[i];
+          streamHorizonTime = Math.max(streamHorizonTime, centralEnd);
+          try {
+            const windowData = chunkAudio(audioData);
+            const output = await asr(windowData, {
+              chunk_length_s: chunkLength,
+              stride_length_s: strideLength,
+              return_timestamps: timestampMode === 'word' ? 'word' : true,
+            });
+            if (localJob !== jobNonce) return;
+            const chunkSegments = alignChunkSegments(
+              outputToSegments(output, timestampMode),
+              windowStartSec,
+              centralStart,
+              centralEnd,
+            );
+            appendTranscriptData(chunkSegments, i + 1, totalChunks);
+          } catch (err) {
+            failedChunks += 1;
+            console.error(err);
+            setWarning(`Chunk ${i + 1} of ${totalChunks} failed to transcribe. Continuing with remaining chunks.`);
+          }
+        }
         if (localJob !== jobNonce) return;
+        if (!segments.length) throw new Error('Transcription finished, but no timestamped segments were returned.');
 
-        const nextSegments = outputToSegments(output, timestampMode);
-        if (!nextSegments.length) throw new Error('Transcription finished, but no timestamped segments were returned.');
-
-        setTranscriptData(nextSegments);
-        setProgress(100, 'Done');
-        setStatus(`Transcript ready with ${nextSegments.length} segments.`);
-        setSuccess('Transcription completed. Play the audio or click any line to jump.');
+        setStatus(`Transcript ready with ${segments.length} segments.`);
+        setSuccess(
+          failedChunks
+            ? `Transcription finished with ${failedChunks} failed chunk(s). Some words may be missing.`
+            : 'Transcription completed. Play the audio or click any line to jump.',
+        );
+        if (failedChunks) {
+          setWarning(`${failedChunks} chunk${failedChunks === 1 ? '' : 's'} failed while transcribing.`);
+        }
       } catch (error) {
         if (localJob !== jobNonce) return;
         console.error(error);
@@ -576,6 +741,8 @@
         setStatus('Transcription did not complete.');
         setIdleProgress('Failed');
       } finally {
+        streamActive = false;
+        streamHorizonTime = 0;
         if (localJob === jobNonce) setBusy(false);
       }
     }
