@@ -89,12 +89,18 @@
       display: inline;
       color: var(--muted);
       cursor: pointer;
-      transition: color .16s ease, font-weight .16s ease, background-color .16s ease;
+      transition: color .16s ease, background-color .16s ease;
+    }
+    .segment-group {
+      display: block;
+      margin-bottom: 2rem;
+    }
+    .segment-group:last-child {
+      margin-bottom: 0;
     }
     .segment:hover { background: rgba(255,255,255,.04); }
     .segment.active {
       color: #fefefe;
-      font-weight: 700;
     }
     .segment-text { color: inherit; white-space: inherit; word-break: break-word; }
     .segment-text mark { background: rgba(122,162,255,.28); color: inherit; padding: .08em .16em; border-radius: .3em; }
@@ -498,11 +504,17 @@
       }
       transcriptEl.innerHTML = '';
       const rawQuery = searchBoxEl.value.trim();
+      let groupEl = null;
       segmentNodes = filteredSegments.map((seg, index) => {
+        if (index % 2 === 0) {
+          groupEl = document.createElement('div');
+          groupEl.className = 'segment-group';
+          transcriptEl.appendChild(groupEl);
+        }
         const node = document.createElement('span');
         node.className = 'segment';
         node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
-        if (index < filteredSegments.length - 1) {
+        if (index % 2 === 0 && index < filteredSegments.length - 1) {
           node.insertAdjacentText('beforeend', ' ');
         }
         node.addEventListener('click', () => {
@@ -510,7 +522,7 @@
           audioEl.play().catch(() => {});
           updateActiveSegment();
         });
-        transcriptEl.appendChild(node);
+        groupEl?.appendChild(node);
         return node;
       });
       updateActiveSegment();
