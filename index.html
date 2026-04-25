@@ -53,6 +53,8 @@
     button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
     button.secondary { background: #1d2852; color: var(--text); border: 1px solid #314172; }
     .btns { display: flex; flex-wrap: wrap; gap: 10px; }
+    .download-row { align-items: center; flex-wrap: wrap; }
+    .download-row select { width: auto; min-width: 170px; }
     .hint, .error, .success, .warning { font-size: 13px; line-height: 1.45; margin-top: 8px; }
     .hint { color: var(--muted); }
     .error { color: var(--error); }
@@ -71,27 +73,45 @@
     audio { width: 100%; margin-bottom: 16px; }
     .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
     .toolbar input[type="text"] { flex: 1 1 220px; }
+    .toolbar .inline-check { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+    .toolbar .inline-check input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
     .transcript {
-      max-height: 66vh; overflow: auto; border: 1px solid var(--line); border-radius: 16px;
+      border: 1px solid var(--line); border-radius: 16px;
       background: rgba(255,255,255,.02);
+      padding: 16px;
+      min-height: 320px;
+      max-height: 56vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.75;
+      font-size: 1.05rem;
+      color: var(--text);
     }
     .segment {
-      padding: 14px 16px; border-bottom: 1px solid rgba(49, 64, 109, .8); cursor: pointer;
-      transition: background .16s ease, outline-color .16s ease;
+      display: inline;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color .16s ease, background-color .16s ease;
     }
-    .segment:last-child { border-bottom: 0; }
-    .segment:hover { background: rgba(255,255,255,.03); }
-    .segment.active { background: var(--active); outline: 1px solid #8fb0ff; }
-    .segment-time { color: #9bffcf; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
-    .segment-text { color: var(--text); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-    .segment-text mark { background: rgba(122,162,255,.28); color: var(--text); padding: .08em .16em; border-radius: .3em; }
+    .segment-group {
+      display: block;
+      margin-bottom: 2rem;
+    }
+    .segment-group:last-child {
+      margin-bottom: 0;
+    }
+    .segment:hover { background: rgba(255,255,255,.04); }
+    .segment.active {
+      color: #fefefe;
+    }
+    .segment-text { color: inherit; white-space: inherit; word-break: break-word; }
+    .segment-text mark { background: rgba(122,162,255,.28); color: inherit; padding: .08em .16em; border-radius: .3em; }
     .empty { padding: 30px 18px; text-align: center; color: var(--muted); line-height: 1.5; }
     .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .smallnote { font-size: 12px; color: var(--muted); }
-    .inline-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); }
+    .timestamp-hint { margin-top: 6px; }
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
-      .transcript { max-height: none; }
       .twocol { grid-template-columns: 1fr; }
     }
   </style>
@@ -153,9 +173,9 @@
             <label for="timestampMode">Timestamps</label>
             <select id="timestampMode">
               <option value="word">word</option>
-              <option value="segment">segment</option>
+              <option value="segment" selected>segment</option>
             </select>
-            <div class="smallnote">Word timestamps are more precise but heavier.</div>
+            <div id="timestampHint" class="smallnote timestamp-hint" style="display:none;">Word timestamps are more precise but heavier.</div>
           </div>
 
           <div class="row btns">
@@ -163,12 +183,16 @@
             <button id="resetBtn" class="secondary" type="button">Reset</button>
           </div>
 
-          <div class="row btns">
-            <button id="downloadJsonBtn" class="secondary" type="button" disabled>Download JSON</button>
-            <button id="downloadSrtBtn" class="secondary" type="button" disabled>Download SRT</button>
-            <button id="downloadVttBtn" class="secondary" type="button" disabled>Download VTT</button>
-            <button id="downloadTxtBtn" class="secondary" type="button" disabled>Download TXT</button>
+          <div class="row btns download-row">
+            <select id="downloadFormat" class="secondary">
+              <option value="json">JSON transcription</option>
+              <option value="srt">SRT transcription</option>
+              <option value="vtt">VTT transcription</option>
+              <option value="txt">TXT transcription</option>
+            </select>
+            <button id="downloadBtn" class="secondary" type="button" disabled>Download</button>
           </div>
+          <div id="downloadAvailabilityHint" class="hint">Download files will be available after transcription is done.</div>
 
           <div class="status-box">
             <div id="status" class="hint">Choose an audio file to begin.</div>
@@ -195,7 +219,10 @@
 
           <div class="toolbar">
             <input id="searchBox" type="text" placeholder="Search transcript text" />
-            <label class="inline-toggle"><input id="autoscrollToggle" type="checkbox" checked /> auto-scroll</label>
+            <label class="inline-check">
+              <input id="autoscrollToggle" type="checkbox" checked />
+              Auto-scroll
+            </label>
           </div>
 
           <div id="transcript" class="transcript">
@@ -218,7 +245,7 @@
     }
 
     const TARGET_SAMPLE_RATE = 16000;
-    const ACTIVE_SEGMENT_HOLD_SECONDS = 1.75;
+    const ACTIVE_SEGMENT_HOLD_SECONDS = 0.08;
     const READABLE_SEGMENT_GAP_SEC = 0.42;
     const READABLE_SEGMENT_MAX_DURATION_SEC = 9;
     const READABLE_SEGMENT_MAX_TEXT_LEN = 280;
@@ -233,10 +260,9 @@
     const timestampModeEl = document.getElementById('timestampMode');
     const transcribeBtn = document.getElementById('transcribeBtn');
     const resetBtn = document.getElementById('resetBtn');
-    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
-    const downloadSrtBtn = document.getElementById('downloadSrtBtn');
-    const downloadVttBtn = document.getElementById('downloadVttBtn');
-    const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+    const downloadFormatEl = document.getElementById('downloadFormat');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const downloadAvailabilityHintEl = document.getElementById('downloadAvailabilityHint');
     const transcriptEl = document.getElementById('transcript');
     const statusEl = document.getElementById('status');
     const errorEl = document.getElementById('error');
@@ -250,6 +276,7 @@
     const timeLabelEl = document.getElementById('timeLabel');
     const searchBoxEl = document.getElementById('searchBox');
     const autoscrollToggleEl = document.getElementById('autoscrollToggle');
+    const timestampHintEl = document.getElementById('timestampHint');
 
     let audioObjectUrl = null;
     let segments = [];
@@ -280,6 +307,17 @@
       chunkLengthEl.disabled = busy;
       strideLengthEl.disabled = busy;
       timestampModeEl.disabled = busy;
+    }
+    function setDownloadReady(ready) {
+      const allowDownload = Boolean(ready);
+      if (downloadFormatEl) downloadFormatEl.disabled = !allowDownload;
+      if (downloadBtn) downloadBtn.disabled = !allowDownload;
+      if (downloadAvailabilityHintEl) {
+        downloadAvailabilityHintEl.textContent = allowDownload
+          ? 'Transcription complete.'
+          : 'Download files will be available after transcription is done.';
+        downloadAvailabilityHintEl.style.display = allowDownload ? 'none' : 'block';
+      }
     }
     function formatTime(totalSeconds, includeMillis = false, srt = false) {
       const safe = Math.max(0, Number(totalSeconds) || 0);
@@ -484,59 +522,49 @@
       }
       transcriptEl.innerHTML = '';
       const rawQuery = searchBoxEl.value.trim();
+      let groupEl = null;
       segmentNodes = filteredSegments.map((seg, index) => {
-        const node = document.createElement('div');
+        if (index % 2 === 0) {
+          groupEl = document.createElement('div');
+          groupEl.className = 'segment-group';
+          transcriptEl.appendChild(groupEl);
+        }
+        const node = document.createElement('span');
         node.className = 'segment';
-        node.innerHTML = `
-          <div class="segment-time">${formatTime(seg.start)} → ${formatTime(seg.end)}</div>
-          <div class="segment-text">${highlightMatch(seg.text, rawQuery)}</div>
-        `;
+        node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
+        if (index % 2 === 0 && index < filteredSegments.length - 1) {
+          node.insertAdjacentText('beforeend', ' ');
+        }
         node.addEventListener('click', () => {
           audioEl.currentTime = seg.start;
           audioEl.play().catch(() => {});
           updateActiveSegment();
         });
-        transcriptEl.appendChild(node);
+        groupEl?.appendChild(node);
         return node;
       });
       updateActiveSegment();
     }
     function findActiveSegmentIndex(time) {
       if (!filteredSegments.length) return -1;
-      let lastBefore = -1;
+      if (!Number.isFinite(time)) return -1;
+      const clampTime = Math.max(0, time);
       for (let i = 0; i < filteredSegments.length; i++) {
         const seg = filteredSegments[i];
-        if (time >= seg.start && time <= seg.end) return i;
-        if (seg.start <= time) lastBefore = i;
-      }
-      if (
-        activeIndex >= 0 &&
-        activeIndex < filteredSegments.length &&
-        time >= filteredSegments[activeIndex].start &&
-        time <= filteredSegments[activeIndex].end + ACTIVE_SEGMENT_HOLD_SECONDS
-      ) {
-        return activeIndex;
-      }
-      if (
-        lastBefore >= 0 &&
-        time - filteredSegments[lastBefore].end <= ACTIVE_SEGMENT_HOLD_SECONDS
-      ) {
-        return lastBefore;
-      }
-      if (streamActive && time <= streamHorizonTime + ACTIVE_SEGMENT_HOLD_SECONDS) {
-        if (activeIndex >= 0) {
-          return Math.min(filteredSegments.length - 1, activeIndex);
+        if (clampTime < seg.start) {
+          if (i > 0) {
+            const prev = filteredSegments[i - 1];
+            if (clampTime - prev.end <= ACTIVE_SEGMENT_HOLD_SECONDS) return i - 1;
+          }
+          return -1;
         }
+        if (clampTime <= seg.end + ACTIVE_SEGMENT_HOLD_SECONDS) return i;
       }
-      if (
-        streamActive &&
-        activeIndex < 0 &&
-        filteredSegments.length &&
-        time < filteredSegments[0].start
-      ) {
-        return -1;
+      if (streamActive && streamHorizonTime > 0) {
+        const last = filteredSegments[filteredSegments.length - 1];
+        if (clampTime <= streamHorizonTime + ACTIVE_SEGMENT_HOLD_SECONDS) return filteredSegments.length - 1;
+        if (clampTime <= last.end + ACTIVE_SEGMENT_HOLD_SECONDS) return filteredSegments.length - 1;
       }
-      if (filteredSegments.length && time >= filteredSegments[filteredSegments.length - 1].start) return filteredSegments.length - 1;
       return -1;
     }
     function updateActiveSegment() {
@@ -545,21 +573,26 @@
       if (nextActive === activeIndex) {
         if (activeIndex >= 0 && segmentNodes[activeIndex]?.classList.contains('active')) return;
       }
-      if (activeIndex >= 0 && segmentNodes[activeIndex]) segmentNodes[activeIndex].classList.remove('active');
+      segmentNodes.forEach((node) => {
+        node.classList.remove('active');
+      });
       activeIndex = nextActive;
       if (activeIndex >= 0 && segmentNodes[activeIndex]) {
         segmentNodes[activeIndex].classList.add('active');
-        if (autoscrollToggleEl.checked) segmentNodes[activeIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        if (autoscrollToggleEl?.checked && !audioEl.paused) {
+          segmentNodes[activeIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
       }
+    }
+    function updateTimestampHint() {
+      if (!timestampHintEl) return;
+      timestampHintEl.style.display = timestampModeEl.value === 'word' ? 'block' : 'none';
     }
     function setTranscriptData(nextSegments) {
       segments = mergeReadableSegments(nextSegments);
       renderTranscript();
       const ready = segments.length > 0;
-      downloadJsonBtn.disabled = !ready;
-      downloadSrtBtn.disabled = !ready;
-      downloadVttBtn.disabled = !ready;
-      downloadTxtBtn.disabled = !ready;
+      setDownloadReady(ready);
     }
     function appendTranscriptData(nextSegments, chunkIndex, totalChunks) {
       if (nextSegments.length) {
@@ -573,10 +606,7 @@
         renderTranscript();
       }
       const ready = segments.length > 0;
-      downloadJsonBtn.disabled = !ready;
-      downloadSrtBtn.disabled = !ready;
-      downloadVttBtn.disabled = !ready;
-      downloadTxtBtn.disabled = !ready;
+      setDownloadReady(ready);
       if (chunkIndex != null && totalChunks != null) {
         setProgress(Math.round((chunkIndex / totalChunks) * 100), `Transcribing chunk ${chunkIndex} / ${totalChunks}`);
       }
@@ -756,10 +786,7 @@
       setWarning('');
       segments = [];
       renderTranscript();
-      downloadJsonBtn.disabled = true;
-      downloadSrtBtn.disabled = true;
-      downloadVttBtn.disabled = true;
-      downloadTxtBtn.disabled = true;
+      setDownloadReady(false);
     }
 
     audioFileEl.addEventListener('change', () => {
@@ -779,15 +806,36 @@
     transcribeBtn.addEventListener('click', transcribeAudio);
     resetBtn.addEventListener('click', resetAll);
     searchBoxEl.addEventListener('input', renderTranscript);
+    timestampModeEl.addEventListener('change', updateTimestampHint);
     audioEl.addEventListener('timeupdate', () => { updateClock(audioEl.currentTime, audioEl.duration); updateActiveSegment(); });
     audioEl.addEventListener('loadedmetadata', () => updateClock(audioEl.currentTime, audioEl.duration));
     audioEl.addEventListener('seeked', updateActiveSegment);
+    audioEl.addEventListener('ended', () => {
+      if (!segmentNodes.length) return;
+      if (activeIndex >= 0) segmentNodes[activeIndex].classList.remove('active');
+      activeIndex = -1;
+    });
 
-    downloadJsonBtn.addEventListener('click', () => download(toJson(), 'transcript.json', 'application/json'));
-    downloadSrtBtn.addEventListener('click', () => download(toSrt(), 'transcript.srt', 'text/plain'));
-    downloadVttBtn.addEventListener('click', () => download(toVtt(), 'transcript.vtt', 'text/vtt'));
-    downloadTxtBtn.addEventListener('click', () => download(toTxt(), 'transcript.txt', 'text/plain'));
+    downloadBtn.addEventListener('click', () => {
+      switch (downloadFormatEl?.value) {
+        case 'srt':
+          download(toSrt(), 'transcript.srt', 'text/plain');
+          break;
+        case 'vtt':
+          download(toVtt(), 'transcript.vtt', 'text/vtt');
+          break;
+        case 'txt':
+          download(toTxt(), 'transcript.txt', 'text/plain');
+          break;
+        case 'json':
+        default:
+          download(toJson(), 'transcript.json', 'application/json');
+          break;
+      }
+    });
 
+    updateTimestampHint();
+    setDownloadReady(false);
     updateClock(0, 0);
     setIdleProgress('Idle');
   </script>
