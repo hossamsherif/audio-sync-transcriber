@@ -226,7 +226,7 @@
     }
 
     const TARGET_SAMPLE_RATE = 16000;
-    const ACTIVE_SEGMENT_HOLD_SECONDS = 1.75;
+    const ACTIVE_SEGMENT_HOLD_SECONDS = 0.08;
     const READABLE_SEGMENT_GAP_SEC = 0.42;
     const READABLE_SEGMENT_MAX_DURATION_SEC = 9;
     const READABLE_SEGMENT_MAX_TEXT_LEN = 280;
@@ -510,46 +510,32 @@
     }
     function findActiveSegmentIndex(time) {
       if (!filteredSegments.length) return -1;
-      let lastBefore = -1;
+      if (!Number.isFinite(time)) return -1;
+      const clampTime = Math.max(0, time);
       for (let i = 0; i < filteredSegments.length; i++) {
         const seg = filteredSegments[i];
-        if (time >= seg.start && time <= seg.end) return i;
-        if (seg.start <= time) lastBefore = i;
-      }
-      if (
-        activeIndex >= 0 &&
-        activeIndex < filteredSegments.length &&
-        time >= filteredSegments[activeIndex].start &&
-        time <= filteredSegments[activeIndex].end + ACTIVE_SEGMENT_HOLD_SECONDS
-      ) {
-        return activeIndex;
-      }
-      if (
-        lastBefore >= 0 &&
-        time - filteredSegments[lastBefore].end <= ACTIVE_SEGMENT_HOLD_SECONDS
-      ) {
-        return lastBefore;
-      }
-      if (streamActive && time <= streamHorizonTime + ACTIVE_SEGMENT_HOLD_SECONDS) {
-        if (activeIndex >= 0) {
-          return Math.min(filteredSegments.length - 1, activeIndex);
+        if (clampTime < seg.start) {
+          if (i > 0) {
+            const prev = filteredSegments[i - 1];
+            if (clampTime - prev.end <= ACTIVE_SEGMENT_HOLD_SECONDS) return i - 1;
+          }
+          return -1;
         }
+        if (clampTime <= seg.end + ACTIVE_SEGMENT_HOLD_SECONDS) return i;
       }
-      if (
-        streamActive &&
-        activeIndex < 0 &&
-        filteredSegments.length &&
-        time < filteredSegments[0].start
-      ) {
-        return -1;
+      if (streamActive && streamHorizonTime > 0) {
+        const last = filteredSegments[filteredSegments.length - 1];
+        if (clampTime <= streamHorizonTime + ACTIVE_SEGMENT_HOLD_SECONDS) return filteredSegments.length - 1;
+        if (clampTime <= last.end + ACTIVE_SEGMENT_HOLD_SECONDS) return filteredSegments.length - 1;
       }
-      if (filteredSegments.length && time >= filteredSegments[filteredSegments.length - 1].start) return filteredSegments.length - 1;
       return -1;
     }
     function updateActiveSegment() {
       if (!segmentNodes.length) return;
       const nextActive = findActiveSegmentIndex(audioEl.currentTime || 0);
-      if (nextActive === activeIndex) return;
+      if (nextActive === activeIndex) {
+        if (activeIndex >= 0 && segmentNodes[activeIndex]?.classList.contains('active')) return;
+      }
       segmentNodes.forEach((node) => {
         node.classList.remove('active');
       });
@@ -788,6 +774,11 @@
     audioEl.addEventListener('timeupdate', () => { updateClock(audioEl.currentTime, audioEl.duration); updateActiveSegment(); });
     audioEl.addEventListener('loadedmetadata', () => updateClock(audioEl.currentTime, audioEl.duration));
     audioEl.addEventListener('seeked', updateActiveSegment);
+    audioEl.addEventListener('ended', () => {
+      if (!segmentNodes.length) return;
+      if (activeIndex >= 0) segmentNodes[activeIndex].classList.remove('active');
+      activeIndex = -1;
+    });
 
     downloadJsonBtn.addEventListener('click', () => download(toJson(), 'transcript.json', 'application/json'));
     downloadSrtBtn.addEventListener('click', () => download(toSrt(), 'transcript.srt', 'text/plain'));
