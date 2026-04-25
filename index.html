@@ -53,6 +53,8 @@
     button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
     button.secondary { background: #1d2852; color: var(--text); border: 1px solid #314172; }
     .btns { display: flex; flex-wrap: wrap; gap: 10px; }
+    .download-row { align-items: center; flex-wrap: wrap; }
+    .download-row select { width: auto; min-width: 170px; }
     .hint, .error, .success, .warning { font-size: 13px; line-height: 1.45; margin-top: 8px; }
     .hint { color: var(--muted); }
     .error { color: var(--error); }
@@ -107,6 +109,7 @@
     .empty { padding: 30px 18px; text-align: center; color: var(--muted); line-height: 1.5; }
     .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .smallnote { font-size: 12px; color: var(--muted); }
+    .timestamp-hint { margin-top: 6px; }
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
       .twocol { grid-template-columns: 1fr; }
@@ -170,9 +173,9 @@
             <label for="timestampMode">Timestamps</label>
             <select id="timestampMode">
               <option value="word">word</option>
-              <option value="segment">segment</option>
+              <option value="segment" selected>segment</option>
             </select>
-            <div class="smallnote">Word timestamps are more precise but heavier.</div>
+            <div id="timestampHint" class="smallnote timestamp-hint" style="display:none;">Word timestamps are more precise but heavier.</div>
           </div>
 
           <div class="row btns">
@@ -180,12 +183,16 @@
             <button id="resetBtn" class="secondary" type="button">Reset</button>
           </div>
 
-          <div class="row btns">
-            <button id="downloadJsonBtn" class="secondary" type="button" disabled>Download JSON</button>
-            <button id="downloadSrtBtn" class="secondary" type="button" disabled>Download SRT</button>
-            <button id="downloadVttBtn" class="secondary" type="button" disabled>Download VTT</button>
-            <button id="downloadTxtBtn" class="secondary" type="button" disabled>Download TXT</button>
+          <div class="row btns download-row">
+            <select id="downloadFormat" class="secondary">
+              <option value="json">Download JSON</option>
+              <option value="srt">Download SRT</option>
+              <option value="vtt">Download VTT</option>
+              <option value="txt">Download TXT</option>
+            </select>
+            <button id="downloadBtn" class="secondary" type="button" disabled>Download</button>
           </div>
+          <div id="downloadAvailabilityHint" class="hint">Download files will be available after transcription is done.</div>
 
           <div class="status-box">
             <div id="status" class="hint">Choose an audio file to begin.</div>
@@ -253,10 +260,9 @@
     const timestampModeEl = document.getElementById('timestampMode');
     const transcribeBtn = document.getElementById('transcribeBtn');
     const resetBtn = document.getElementById('resetBtn');
-    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
-    const downloadSrtBtn = document.getElementById('downloadSrtBtn');
-    const downloadVttBtn = document.getElementById('downloadVttBtn');
-    const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+    const downloadFormatEl = document.getElementById('downloadFormat');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const downloadAvailabilityHintEl = document.getElementById('downloadAvailabilityHint');
     const transcriptEl = document.getElementById('transcript');
     const statusEl = document.getElementById('status');
     const errorEl = document.getElementById('error');
@@ -270,6 +276,7 @@
     const timeLabelEl = document.getElementById('timeLabel');
     const searchBoxEl = document.getElementById('searchBox');
     const autoscrollToggleEl = document.getElementById('autoscrollToggle');
+    const timestampHintEl = document.getElementById('timestampHint');
 
     let audioObjectUrl = null;
     let segments = [];
@@ -300,6 +307,17 @@
       chunkLengthEl.disabled = busy;
       strideLengthEl.disabled = busy;
       timestampModeEl.disabled = busy;
+    }
+    function setDownloadReady(ready) {
+      const allowDownload = Boolean(ready);
+      if (downloadFormatEl) downloadFormatEl.disabled = !allowDownload;
+      if (downloadBtn) downloadBtn.disabled = !allowDownload;
+      if (downloadAvailabilityHintEl) {
+        downloadAvailabilityHintEl.textContent = allowDownload
+          ? 'Transcription complete.'
+          : 'Download files will be available after transcription is done.';
+        downloadAvailabilityHintEl.style.display = allowDownload ? 'none' : 'block';
+      }
     }
     function formatTime(totalSeconds, includeMillis = false, srt = false) {
       const safe = Math.max(0, Number(totalSeconds) || 0);
@@ -566,14 +584,15 @@
         }
       }
     }
+    function updateTimestampHint() {
+      if (!timestampHintEl) return;
+      timestampHintEl.style.display = timestampModeEl.value === 'word' ? 'block' : 'none';
+    }
     function setTranscriptData(nextSegments) {
       segments = mergeReadableSegments(nextSegments);
       renderTranscript();
       const ready = segments.length > 0;
-      downloadJsonBtn.disabled = !ready;
-      downloadSrtBtn.disabled = !ready;
-      downloadVttBtn.disabled = !ready;
-      downloadTxtBtn.disabled = !ready;
+      setDownloadReady(ready);
     }
     function appendTranscriptData(nextSegments, chunkIndex, totalChunks) {
       if (nextSegments.length) {
@@ -587,10 +606,7 @@
         renderTranscript();
       }
       const ready = segments.length > 0;
-      downloadJsonBtn.disabled = !ready;
-      downloadSrtBtn.disabled = !ready;
-      downloadVttBtn.disabled = !ready;
-      downloadTxtBtn.disabled = !ready;
+      setDownloadReady(ready);
       if (chunkIndex != null && totalChunks != null) {
         setProgress(Math.round((chunkIndex / totalChunks) * 100), `Transcribing chunk ${chunkIndex} / ${totalChunks}`);
       }
@@ -770,10 +786,7 @@
       setWarning('');
       segments = [];
       renderTranscript();
-      downloadJsonBtn.disabled = true;
-      downloadSrtBtn.disabled = true;
-      downloadVttBtn.disabled = true;
-      downloadTxtBtn.disabled = true;
+      setDownloadReady(false);
     }
 
     audioFileEl.addEventListener('change', () => {
@@ -793,6 +806,7 @@
     transcribeBtn.addEventListener('click', transcribeAudio);
     resetBtn.addEventListener('click', resetAll);
     searchBoxEl.addEventListener('input', renderTranscript);
+    timestampModeEl.addEventListener('change', updateTimestampHint);
     audioEl.addEventListener('timeupdate', () => { updateClock(audioEl.currentTime, audioEl.duration); updateActiveSegment(); });
     audioEl.addEventListener('loadedmetadata', () => updateClock(audioEl.currentTime, audioEl.duration));
     audioEl.addEventListener('seeked', updateActiveSegment);
@@ -802,11 +816,26 @@
       activeIndex = -1;
     });
 
-    downloadJsonBtn.addEventListener('click', () => download(toJson(), 'transcript.json', 'application/json'));
-    downloadSrtBtn.addEventListener('click', () => download(toSrt(), 'transcript.srt', 'text/plain'));
-    downloadVttBtn.addEventListener('click', () => download(toVtt(), 'transcript.vtt', 'text/vtt'));
-    downloadTxtBtn.addEventListener('click', () => download(toTxt(), 'transcript.txt', 'text/plain'));
+    downloadBtn.addEventListener('click', () => {
+      switch (downloadFormatEl?.value) {
+        case 'srt':
+          download(toSrt(), 'transcript.srt', 'text/plain');
+          break;
+        case 'vtt':
+          download(toVtt(), 'transcript.vtt', 'text/vtt');
+          break;
+        case 'txt':
+          download(toTxt(), 'transcript.txt', 'text/plain');
+          break;
+        case 'json':
+        default:
+          download(toJson(), 'transcript.json', 'application/json');
+          break;
+      }
+    });
 
+    updateTimestampHint();
+    setDownloadReady(false);
     updateClock(0, 0);
     setIdleProgress('Idle');
   </script>
