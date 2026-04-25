@@ -71,6 +71,8 @@
     audio { width: 100%; margin-bottom: 16px; }
     .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
     .toolbar input[type="text"] { flex: 1 1 220px; }
+    .toolbar .inline-check { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+    .toolbar .inline-check input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
     .transcript {
       border: 1px solid var(--line); border-radius: 16px;
       background: rgba(255,255,255,.02);
@@ -204,6 +206,10 @@
 
           <div class="toolbar">
             <input id="searchBox" type="text" placeholder="Search transcript text" />
+            <label class="inline-check">
+              <input id="autoscrollToggle" type="checkbox" checked />
+              Auto-scroll
+            </label>
           </div>
 
           <div id="transcript" class="transcript">
@@ -257,6 +263,7 @@
     const countLabelEl = document.getElementById('countLabel');
     const timeLabelEl = document.getElementById('timeLabel');
     const searchBoxEl = document.getElementById('searchBox');
+    const autoscrollToggleEl = document.getElementById('autoscrollToggle');
 
     let audioObjectUrl = null;
     let segments = [];
@@ -542,6 +549,9 @@
       activeIndex = nextActive;
       if (activeIndex >= 0 && segmentNodes[activeIndex]) {
         segmentNodes[activeIndex].classList.add('active');
+        if (autoscrollToggleEl?.checked) {
+          segmentNodes[activeIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
       }
     }
     function setTranscriptData(nextSegments) {
