@@ -561,7 +561,7 @@
       activeIndex = nextActive;
       if (activeIndex >= 0 && segmentNodes[activeIndex]) {
         segmentNodes[activeIndex].classList.add('active');
-        if (autoscrollToggleEl?.checked) {
+        if (autoscrollToggleEl?.checked && !audioEl.paused) {
           segmentNodes[activeIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }
