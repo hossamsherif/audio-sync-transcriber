@@ -17,41 +17,62 @@
       --success: #9bffcf;
       --error: #ff8d8d;
       --warning: #ffd37a;
+      --shadow: rgba(0, 0, 0, 0.25);
+      --soft: rgba(255,255,255,.02);
+      --soft-hover: rgba(255,255,255,.04);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: var(--text);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0b1020 0%, #10162b 100%);
+      background: linear-gradient(180deg, var(--bg) 0%, #10162b 100%);
+      transition: background .18s ease, color .18s ease;
+    }
+    body.theme-light {
+      --bg: #eef3f8;
+      --panel: #ffffff;
+      --panel-2: #f5f8fc;
+      --text: #172033;
+      --muted: #5f6f86;
+      --accent: #2368d8;
+      --line: #d8e1ee;
+      --active: #e7efff;
+      --success: #096b46;
+      --error: #b42318;
+      --warning: #946200;
+      --shadow: rgba(34, 48, 74, 0.12);
+      --soft: rgba(35, 104, 216, .04);
+      --soft-hover: rgba(35, 104, 216, .08);
+      background: linear-gradient(180deg, #eef3f8 0%, #f8fbff 100%);
     }
     .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
     h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.15; }
     .sub { margin: 0 0 20px; color: var(--muted); font-size: 15px; line-height: 1.5; }
     .grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
     .card {
-      background: rgba(18, 25, 51, 0.92);
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 18px;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 14px 40px var(--shadow);
       overflow: hidden;
     }
     .card-head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
     .card-head h2 { margin: 0; font-size: 16px; }
     .card-body { padding: 16px 18px; }
     .row { margin-bottom: 16px; }
-    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #d8e0ff; }
+    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
     input[type="file"], input[type="text"], select, textarea, input[type="number"] {
-      width: 100%; background: var(--panel-2); border: 1px solid #32406f; color: var(--text);
-      border-radius: 12px; padding: 10px 12px; font: inherit;
-    }
+	      width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+	      border-radius: 12px; padding: 10px 12px; font: inherit;
+	    }
     button {
       border: 0; background: var(--accent); color: #081127; padding: 10px 14px; border-radius: 999px;
       font: inherit; font-weight: 700; cursor: pointer; transition: transform .14s ease, opacity .14s ease;
     }
     button:hover { transform: translateY(-1px); }
     button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
-    button.secondary { background: #1d2852; color: var(--text); border: 1px solid #314172; }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
     .btns { display: flex; flex-wrap: wrap; gap: 10px; }
     .download-row { align-items: center; flex-wrap: wrap; }
     .download-row select { width: auto; min-width: 170px; }
@@ -62,13 +83,13 @@
     .warning { color: var(--warning); }
     .chips { display: flex; gap: 8px; flex-wrap: wrap; }
     .chip {
-      padding: 6px 10px; border-radius: 999px; background: #1d2852; color: var(--muted);
-      border: 1px solid #30406d; font-size: 12px;
-    }
-    .status-box {
-      border: 1px solid var(--line); border-radius: 14px; padding: 12px;
-      background: rgba(255,255,255,.02); margin-top: 10px;
-    }
+	      padding: 6px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted);
+	      border: 1px solid var(--line); font-size: 12px;
+	    }
+	    .status-box {
+	      border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+	      background: var(--soft); margin-top: 10px;
+	    }
     progress { width: 100%; height: 10px; margin-top: 8px; }
     audio { width: 100%; margin-bottom: 16px; }
     .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
@@ -77,7 +98,7 @@
     .toolbar .inline-check input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
     .transcript {
       border: 1px solid var(--line); border-radius: 16px;
-      background: rgba(255,255,255,.02);
+	      background: var(--soft);
       padding: 16px;
       min-height: 320px;
       max-height: 56vh;
@@ -100,7 +121,7 @@
     .segment-group:last-child {
       margin-bottom: 0;
     }
-    .segment:hover { background: rgba(255,255,255,.04); }
+    .segment:hover { background: var(--soft-hover); }
     .segment.active {
       color: #fefefe;
     }
@@ -110,18 +131,190 @@
     .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .smallnote { font-size: 12px; color: var(--muted); }
     .timestamp-hint { margin-top: 6px; }
+    .topline { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+    .topline .sub { margin-bottom: 0; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .tabs { display: inline-flex; gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--soft); }
+    .tab-btn { background: transparent; color: var(--muted); border: 0; padding: 8px 12px; }
+    .tab-btn.active { background: var(--accent); color: #081127; }
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .icon-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .app-panel[hidden] { display: none; }
+    .tts-grid { grid-template-columns: minmax(0, 1fr) 360px; }
+    .tts-textarea { min-height: 420px; resize: vertical; line-height: 1.65; }
+    .tts-controls { display: grid; gap: 14px; }
+    .tts-voice-tools { display: grid; gap: 10px; }
+    .tts-voice-picker { position: relative; }
+    .tts-voice-trigger {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      text-align: left;
+    }
+    .tts-voice-trigger-text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tts-voice-caret {
+      flex: 0 0 auto;
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+      opacity: .75;
+    }
+    .tts-voice-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 16px 36px var(--shadow);
+      overflow: hidden;
+    }
+    .tts-voice-menu-head {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .tts-voice-options {
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 6px;
+      display: grid;
+      gap: 4px;
+    }
+    .tts-voice-option {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      padding: 10px 12px;
+      text-align: left;
+      display: grid;
+      gap: 2px;
+    }
+    .tts-voice-option:hover { background: var(--soft-hover); }
+    .tts-voice-option.active {
+      background: var(--soft);
+      border-color: var(--line);
+    }
+    .tts-voice-option-name {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .tts-voice-option-meta {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .tts-voice-empty {
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .tts-voice-menu-meta {
+      padding: 0 12px 12px;
+    }
+    .tts-range-row { display: grid; grid-template-columns: 78px 1fr 52px; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
+    .tts-range-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .tts-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tts-actions button { width: 100%; }
+    .tts-status { min-height: 42px; }
+    .mode-note {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--soft);
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .debug-log {
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px solid #2a3a73;
+      border-radius: 10px;
+      background: rgba(2, 6, 22, 0.55);
+      color: var(--muted);
+      max-height: 170px;
+      overflow-y: auto;
+      font-size: 11px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      display: none;
+    }
+    .debug-log-entry { margin: 0; }
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
+      .tts-grid { grid-template-columns: 1fr; }
       .twocol { grid-template-columns: 1fr; }
+      .topline { display: block; }
+      .top-actions { margin-top: 14px; }
+      .tabs { width: 100%; }
+      .tab-btn { flex: 1; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Browser Transcriber + Sync Player</h1>
-    <p class="sub">This version avoids the broken quantized ONNX path by loading Whisper in full precision by default. It transcribes in your browser, then syncs and highlights the transcript while audio plays.</p>
+    <div class="topline">
+      <div>
+        <h1>Browser Audio Studio</h1>
+        <p class="sub">Transcribe audio, sync playback, and read text aloud with browser-first tools that work on GitHub Pages.</p>
+      </div>
+      <div class="top-actions">
+        <div class="tabs" role="tablist" aria-label="Audio tools">
+          <button id="transcribeTab" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="transcribePanel">Transcribe</button>
+          <button id="ttsTab" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="ttsPanel">Text to speech</button>
+        </div>
+        <button id="themeToggleBtn" class="icon-btn" type="button" aria-label="Switch to light theme" title="Switch to light theme">
+          <svg id="themeToggleSun" viewBox="0 0 24 24" hidden>
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2.5"></path>
+            <path d="M12 19.5V22"></path>
+            <path d="M4.93 4.93l1.77 1.77"></path>
+            <path d="M17.3 17.3l1.77 1.77"></path>
+            <path d="M2 12h2.5"></path>
+            <path d="M19.5 12H22"></path>
+            <path d="M4.93 19.07l1.77-1.77"></path>
+            <path d="M17.3 6.7l1.77-1.77"></path>
+          </svg>
+          <svg id="themeToggleMoon" viewBox="0 0 24 24">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
 
-    <div class="grid">
+    <section id="transcribePanel" class="app-panel" role="tabpanel" aria-labelledby="transcribeTab">
+      <div class="grid">
       <section class="card">
         <div class="card-head"><h2>Transcribe</h2></div>
         <div class="card-body">
@@ -161,11 +354,11 @@
           <div class="row twocol">
             <div>
               <label for="chunkLength">Chunk length (seconds)</label>
-              <input id="chunkLength" type="number" min="10" max="60" step="1" value="29" />
+              <input id="chunkLength" type="number" min="10" max="28" step="1" value="24" />
             </div>
             <div>
               <label for="strideLength">Stride (seconds)</label>
-              <input id="strideLength" type="number" min="1" max="10" step="1" value="5" />
+              <input id="strideLength" type="number" min="1" max="5" step="1" value="3" />
             </div>
           </div>
 
@@ -223,14 +416,101 @@
               <input id="autoscrollToggle" type="checkbox" checked />
               Auto-scroll
             </label>
+            <label id="debugLogToggleLabel" class="inline-check" hidden>
+              <input id="debugLogToggle" type="checkbox" />
+              Debug logging
+            </label>
           </div>
 
           <div id="transcript" class="transcript">
             <div class="empty">Transcribe an audio file to generate a synced transcript here.</div>
           </div>
+          <div id="debugLog" class="debug-log" aria-live="polite"></div>
         </div>
       </section>
-    </div>
+      </div>
+    </section>
+
+    <section id="ttsPanel" class="app-panel" role="tabpanel" aria-labelledby="ttsTab" hidden>
+      <div class="grid tts-grid">
+        <section class="card">
+          <div class="card-head"><h2>Text to Speech</h2></div>
+          <div class="card-body">
+            <div class="row">
+              <label for="ttsText">Text</label>
+              <textarea id="ttsText" class="tts-textarea" placeholder="Paste or type text here. Select part of it to read only that section.">Paste or type your text here. You can also select part of the text and click Read Selection.</textarea>
+            </div>
+            <div class="btns">
+              <button id="ttsReadAllBtn" type="button">Read All</button>
+              <button id="ttsReadSelectionBtn" class="secondary" type="button">Read Selection</button>
+              <button id="ttsUseTranscriptBtn" class="secondary" type="button">Use Transcript</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>Voice Controls</h2></div>
+          <div class="card-body tts-controls">
+            <div>
+              <label for="ttsEngineSelect">Speech engine</label>
+              <select id="ttsEngineSelect">
+                <option value="browser">Browser voices</option>
+              </select>
+              <div class="hint">Provider audio and local Piper models need extra runtime or backend setup, so this GitHub Pages version uses browser voices by default.</div>
+            </div>
+
+            <div>
+              <label for="ttsVoiceTriggerBtn">Browser voice</label>
+              <div class="tts-voice-tools">
+                <div class="btns">
+                  <div class="tts-voice-picker">
+                    <button id="ttsVoiceTriggerBtn" class="tts-voice-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                      <span id="ttsVoiceTriggerText" class="tts-voice-trigger-text">Loading browser voices...</span>
+                      <span class="tts-voice-caret" aria-hidden="true"></span>
+                    </button>
+                    <div id="ttsVoiceMenu" class="tts-voice-menu" hidden>
+                      <div class="tts-voice-menu-head">
+                        <input id="ttsVoiceSearchInput" type="text" placeholder="Search voices by name or language" />
+                      </div>
+                      <div id="ttsVoiceOptions" class="tts-voice-options" role="listbox" aria-label="Browser voices"></div>
+                      <div id="ttsVoiceSearchMeta" class="smallnote tts-voice-menu-meta"></div>
+                    </div>
+                  </div>
+                  <button id="ttsReloadVoicesBtn" class="secondary" type="button" title="Reload voices">Reload</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="tts-range-row">
+              <span>Speed</span>
+              <input id="ttsRate" type="range" min="0.5" max="2" step="0.1" value="1" />
+              <span id="ttsRateValue">1.0x</span>
+            </div>
+            <div class="tts-range-row">
+              <span>Pitch</span>
+              <input id="ttsPitch" type="range" min="0.5" max="2" step="0.1" value="1" />
+              <span id="ttsPitchValue">1.0</span>
+            </div>
+            <div class="tts-range-row">
+              <span>Volume</span>
+              <input id="ttsVolume" type="range" min="0" max="1" step="0.1" value="1" />
+              <span id="ttsVolumeValue">100%</span>
+            </div>
+
+            <div class="tts-actions">
+              <button id="ttsPauseResumeBtn" class="secondary" type="button" disabled>Pause</button>
+              <button id="ttsStopBtn" class="secondary" type="button" disabled>Stop</button>
+            </div>
+
+            <div class="mode-note">
+              <div id="ttsCurrentVoice">Voice: loading browser voices...</div>
+              <div id="ttsStatus" class="hint tts-status">Idle</div>
+              <div id="ttsError" class="error"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -245,6 +525,12 @@
     }
 
     const TARGET_SAMPLE_RATE = 16000;
+    const MAX_ASR_WINDOW_SECONDS = 30;
+    const SAMPLE_PROCESS_BATCH_SIZE = 250000;
+    const DESKTOP_MAX_AUDIO_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+    const MOBILE_MAX_AUDIO_FILE_SIZE_BYTES = 40 * 1024 * 1024;
+    const DESKTOP_MAX_AUDIO_DURATION_SECONDS = 45 * 60;
+    const MOBILE_MAX_AUDIO_DURATION_SECONDS = 15 * 60;
     const ACTIVE_SEGMENT_HOLD_SECONDS = 0.08;
     const READABLE_SEGMENT_GAP_SEC = 0.42;
     const READABLE_SEGMENT_MAX_DURATION_SEC = 9;
@@ -277,6 +563,39 @@
     const searchBoxEl = document.getElementById('searchBox');
     const autoscrollToggleEl = document.getElementById('autoscrollToggle');
     const timestampHintEl = document.getElementById('timestampHint');
+    const debugLogEl = document.getElementById('debugLog');
+    const debugLogToggleEl = document.getElementById('debugLogToggle');
+    const debugLogToggleLabelEl = document.getElementById('debugLogToggleLabel');
+    const transcribeTabEl = document.getElementById('transcribeTab');
+    const ttsTabEl = document.getElementById('ttsTab');
+    const transcribePanelEl = document.getElementById('transcribePanel');
+    const ttsPanelEl = document.getElementById('ttsPanel');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeToggleSunEl = document.getElementById('themeToggleSun');
+    const themeToggleMoonEl = document.getElementById('themeToggleMoon');
+    const ttsTextEl = document.getElementById('ttsText');
+    const ttsEngineSelectEl = document.getElementById('ttsEngineSelect');
+    const ttsVoiceTriggerBtn = document.getElementById('ttsVoiceTriggerBtn');
+    const ttsVoiceTriggerTextEl = document.getElementById('ttsVoiceTriggerText');
+    const ttsVoiceMenuEl = document.getElementById('ttsVoiceMenu');
+    const ttsVoiceSearchInputEl = document.getElementById('ttsVoiceSearchInput');
+    const ttsVoiceOptionsEl = document.getElementById('ttsVoiceOptions');
+    const ttsVoiceSearchMetaEl = document.getElementById('ttsVoiceSearchMeta');
+    const ttsReloadVoicesBtn = document.getElementById('ttsReloadVoicesBtn');
+    const ttsReadAllBtn = document.getElementById('ttsReadAllBtn');
+    const ttsReadSelectionBtn = document.getElementById('ttsReadSelectionBtn');
+    const ttsUseTranscriptBtn = document.getElementById('ttsUseTranscriptBtn');
+    const ttsPauseResumeBtn = document.getElementById('ttsPauseResumeBtn');
+    const ttsStopBtn = document.getElementById('ttsStopBtn');
+    const ttsRateEl = document.getElementById('ttsRate');
+    const ttsPitchEl = document.getElementById('ttsPitch');
+    const ttsVolumeEl = document.getElementById('ttsVolume');
+    const ttsRateValueEl = document.getElementById('ttsRateValue');
+    const ttsPitchValueEl = document.getElementById('ttsPitchValue');
+    const ttsVolumeValueEl = document.getElementById('ttsVolumeValue');
+    const ttsCurrentVoiceEl = document.getElementById('ttsCurrentVoice');
+    const ttsStatusEl = document.getElementById('ttsStatus');
+    const ttsErrorEl = document.getElementById('ttsError');
 
     let audioObjectUrl = null;
     let segments = [];
@@ -288,6 +607,308 @@
     let jobNonce = 0;
     let streamActive = false;
     let streamHorizonTime = 0;
+    let debugSession = null;
+    let activeUpdateCount = 0;
+    let ttsVoices = [];
+    let ttsVoiceURI = '';
+    let ttsUtterance = null;
+    let ttsSpeaking = false;
+    let ttsPaused = false;
+    let ttsVoiceSearch = '';
+    const debugControlsAllowed = new URLSearchParams(window.location.search).get('debug') === '1';
+
+    function isDebugEnabled() { return debugControlsAllowed && Boolean(debugLogToggleEl?.checked); }
+    function toFixedOrZero(value) { return Number.isFinite(value) ? value.toFixed(1) : '0.0'; }
+    function appendDebugLog(message) {
+      if (!isDebugEnabled()) return;
+      const now = new Date().toISOString();
+      const line = `[${now}] ${message}`;
+      if (debugLogEl) {
+        const entry = document.createElement('div');
+        entry.className = 'debug-log-entry';
+        entry.textContent = line;
+        debugLogEl.appendChild(entry);
+        while (debugLogEl.children.length > 120) debugLogEl.removeChild(debugLogEl.firstChild);
+        debugLogEl.style.display = 'block';
+        debugLogEl.scrollTop = debugLogEl.scrollHeight;
+      }
+      console.debug(`[transcribe-debug] ${message}`);
+    }
+    function clearDebugLog() {
+      if (!debugLogEl) return;
+      debugLogEl.innerHTML = '';
+      debugLogEl.style.display = 'none';
+    }
+
+    function canUseSpeechSynthesis() {
+      return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    }
+    function setActiveTab(tab) {
+      const showTts = tab === 'tts';
+      transcribePanelEl.hidden = showTts;
+      ttsPanelEl.hidden = !showTts;
+      transcribeTabEl.classList.toggle('active', !showTts);
+      ttsTabEl.classList.toggle('active', showTts);
+      transcribeTabEl.setAttribute('aria-selected', String(!showTts));
+      ttsTabEl.setAttribute('aria-selected', String(showTts));
+    }
+    function applyTheme(theme) {
+      const nextTheme = theme === 'light' ? 'light' : 'dark';
+      document.body.classList.toggle('theme-light', nextTheme === 'light');
+      if (themeToggleSunEl) themeToggleSunEl.hidden = nextTheme !== 'light';
+      if (themeToggleMoonEl) themeToggleMoonEl.hidden = nextTheme === 'light';
+      if (themeToggleBtn) {
+        const nextLabel = nextTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
+        themeToggleBtn.setAttribute('aria-label', nextLabel);
+        themeToggleBtn.title = nextLabel;
+        themeToggleBtn.dataset.theme = nextTheme;
+      }
+      try { localStorage.setItem('audioStudioTheme', nextTheme); } catch (_) {}
+    }
+    function loadSavedTheme() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('audioStudioTheme') || savedTheme; } catch (_) {}
+      applyTheme(savedTheme);
+    }
+    function getTextSelection(value, selectionStart, selectionEnd) {
+      const start = Math.max(0, Math.min(selectionStart, selectionEnd, value.length));
+      const end = Math.max(0, Math.min(Math.max(selectionStart, selectionEnd), value.length));
+      return value.substring(start, end).trim();
+    }
+    function scoreTtsVoice(voice) {
+      const name = voice.name.toLowerCase();
+      let score = 0;
+      if (/natural|neural|premium|enhanced|online/.test(name)) score += 50;
+      if (/google|microsoft|samantha|ava|alloy|aria|jenny|guy|zira/.test(name)) score += 20;
+      if (voice.lang.toLowerCase().startsWith('en')) score += 10;
+      return score;
+    }
+    function sortTtsVoices(voices) {
+      return [...voices].sort((a, b) => scoreTtsVoice(b) - scoreTtsVoice(a) || a.name.localeCompare(b.name));
+    }
+    function pickPreferredTtsVoice(voices, currentVoiceURI) {
+      if (voices.some(voice => voice.voiceURI === currentVoiceURI)) return currentVoiceURI;
+      const preferredVoice =
+        voices.find(voice => /natural|neural|premium|enhanced|online/i.test(voice.name)) ||
+        voices.find(voice => voice.lang.toLowerCase().startsWith('en')) ||
+        voices[0];
+      return preferredVoice?.voiceURI || '';
+    }
+    function setTtsStatus(message) {
+      if (ttsStatusEl) ttsStatusEl.textContent = message || 'Idle';
+    }
+    function setTtsError(message = '') {
+      if (ttsErrorEl) ttsErrorEl.textContent = message;
+    }
+    function getSelectedTtsVoice() {
+      return ttsVoices.find(voice => voice.voiceURI === ttsVoiceURI) || ttsVoices[0] || null;
+    }
+    function setTtsVoiceMenuOpen(open) {
+      if (!ttsVoiceMenuEl || !ttsVoiceTriggerBtn) return;
+      ttsVoiceMenuEl.hidden = !open;
+      ttsVoiceTriggerBtn.setAttribute('aria-expanded', String(open));
+      if (open && ttsVoiceSearchInputEl) {
+        ttsVoiceSearchInputEl.value = ttsVoiceSearch;
+        requestAnimationFrame(() => ttsVoiceSearchInputEl.focus());
+      }
+    }
+    function clearTtsVoiceSearch() {
+      ttsVoiceSearch = '';
+      if (ttsVoiceSearchInputEl) ttsVoiceSearchInputEl.value = '';
+    }
+    function closeTtsVoiceMenu(resetSearch = false) {
+      if (resetSearch) {
+        clearTtsVoiceSearch();
+        renderTtsVoiceOptions();
+      }
+      setTtsVoiceMenuOpen(false);
+    }
+    function getFilteredTtsVoices() {
+      const query = ttsVoiceSearch.trim().toLowerCase();
+      if (!query) return [...ttsVoices];
+      return ttsVoices.filter(voice =>
+        voice.name.toLowerCase().includes(query) ||
+        voice.lang.toLowerCase().includes(query) ||
+        voice.voiceURI.toLowerCase().includes(query)
+      );
+    }
+    function updateTtsCurrentVoice() {
+      const selectedVoice = getSelectedTtsVoice();
+      if (!ttsCurrentVoiceEl) return;
+      ttsCurrentVoiceEl.textContent = selectedVoice
+        ? `Voice: ${selectedVoice.name} (${selectedVoice.lang})`
+        : 'Voice: no browser voice selected';
+      if (ttsVoiceTriggerTextEl) {
+        ttsVoiceTriggerTextEl.textContent = selectedVoice
+          ? `${selectedVoice.name} - ${selectedVoice.lang}`
+          : 'No browser voice selected';
+      }
+    }
+    function updateTtsControlState() {
+      const supported = canUseSpeechSynthesis();
+      const hasText = Boolean(ttsTextEl?.value.trim());
+      ttsReadAllBtn.disabled = !supported || !hasText;
+      ttsReadSelectionBtn.disabled = !supported || !hasText;
+      ttsPauseResumeBtn.disabled = !ttsSpeaking;
+      ttsStopBtn.disabled = !ttsSpeaking;
+      ttsPauseResumeBtn.textContent = ttsPaused ? 'Resume' : 'Pause';
+      ttsVoiceTriggerBtn.disabled = !supported || !ttsVoices.length;
+      ttsReloadVoicesBtn.disabled = !supported;
+      if ((!supported || !ttsVoices.length) && ttsVoiceMenuEl && !ttsVoiceMenuEl.hidden) closeTtsVoiceMenu(true);
+    }
+    function renderTtsVoiceOptions() {
+      if (!ttsVoiceOptionsEl) return;
+      ttsVoiceOptionsEl.innerHTML = '';
+      if (!canUseSpeechSynthesis()) {
+        ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">Speech synthesis is not supported</div>';
+        setTtsStatus('Your browser does not support text to speech.');
+        updateTtsCurrentVoice();
+        updateTtsControlState();
+        return;
+      }
+      if (!ttsVoices.length) {
+        ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">No voices loaded yet</div>';
+        setTtsStatus('Browser voices are still loading. Try Reload if the list stays empty.');
+        updateTtsCurrentVoice();
+        updateTtsControlState();
+        return;
+      }
+      const filteredVoices = getFilteredTtsVoices();
+      const selectedVoice = getSelectedTtsVoice();
+      const visibleVoices = [...filteredVoices];
+      if (ttsVoiceSearch && selectedVoice && !filteredVoices.some(voice => voice.voiceURI === selectedVoice.voiceURI)) {
+        visibleVoices.unshift(selectedVoice);
+      }
+      if (!visibleVoices.length) {
+        ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">No voices match this search</div>';
+        if (ttsVoiceSearchMetaEl) ttsVoiceSearchMetaEl.textContent = '0 matching voices';
+        updateTtsCurrentVoice();
+        updateTtsControlState();
+        return;
+      }
+      for (const voice of visibleVoices) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = `tts-voice-option${voice.voiceURI === ttsVoiceURI ? ' active' : ''}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(voice.voiceURI === ttsVoiceURI));
+        const isPinnedCurrent = Boolean(ttsVoiceSearch && selectedVoice && voice.voiceURI === selectedVoice.voiceURI && !filteredVoices.some(item => item.voiceURI === voice.voiceURI));
+        const badge = isPinnedCurrent ? 'Current' : scoreTtsVoice(voice) >= 50 ? 'Natural' : '';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'tts-voice-option-name';
+        nameEl.textContent = `${badge ? `${badge} - ` : ''}${voice.name}`;
+        const metaEl = document.createElement('span');
+        metaEl.className = 'tts-voice-option-meta';
+        metaEl.textContent = voice.lang;
+        option.appendChild(nameEl);
+        option.appendChild(metaEl);
+        option.addEventListener('click', () => {
+          ttsVoiceURI = voice.voiceURI;
+          updateTtsCurrentVoice();
+          renderTtsVoiceOptions();
+          closeTtsVoiceMenu(true);
+        });
+        ttsVoiceOptionsEl.appendChild(option);
+      }
+      if (ttsVoiceSearchMetaEl) {
+        ttsVoiceSearchMetaEl.textContent = ttsVoiceSearch
+          ? `${filteredVoices.length} matching voice${filteredVoices.length === 1 ? '' : 's'}`
+          : `${ttsVoices.length} available voice${ttsVoices.length === 1 ? '' : 's'}`;
+      }
+      setTtsStatus('Ready');
+      updateTtsCurrentVoice();
+      updateTtsControlState();
+    }
+    function loadTtsVoices() {
+      if (!canUseSpeechSynthesis()) {
+        renderTtsVoiceOptions();
+        return;
+      }
+      ttsVoices = sortTtsVoices(window.speechSynthesis.getVoices());
+      ttsVoiceURI = pickPreferredTtsVoice(ttsVoices, ttsVoiceURI);
+      renderTtsVoiceOptions();
+    }
+    function setTtsSpeakingState(speaking, paused = false) {
+      ttsSpeaking = speaking;
+      ttsPaused = paused;
+      updateTtsControlState();
+    }
+    function updateTtsRangeLabels() {
+      ttsRateValueEl.textContent = `${Number(ttsRateEl.value).toFixed(1)}x`;
+      ttsPitchValueEl.textContent = Number(ttsPitchEl.value).toFixed(1);
+      ttsVolumeValueEl.textContent = `${Math.round(Number(ttsVolumeEl.value) * 100)}%`;
+    }
+    function stopTts() {
+      if (canUseSpeechSynthesis()) window.speechSynthesis.cancel();
+      ttsUtterance = null;
+      setTtsSpeakingState(false, false);
+      setTtsStatus('Stopped');
+    }
+    function speakTts(content) {
+      const cleanContent = String(content || '').trim();
+      if (!cleanContent) {
+        setTtsStatus('Add text first.');
+        return;
+      }
+      if (!canUseSpeechSynthesis()) {
+        setTtsError('This browser does not support the Web Speech API.');
+        updateTtsControlState();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      setTtsError('');
+      const utterance = new SpeechSynthesisUtterance(cleanContent);
+      const selectedVoice = getSelectedTtsVoice();
+      if (selectedVoice) utterance.voice = selectedVoice;
+      utterance.rate = Number(ttsRateEl.value) || 1;
+      utterance.pitch = Number(ttsPitchEl.value) || 1;
+      utterance.volume = Number(ttsVolumeEl.value) || 1;
+      utterance.onstart = () => {
+        setTtsStatus('Speaking with browser voice.');
+        setTtsSpeakingState(true, false);
+      };
+      utterance.onend = () => {
+        ttsUtterance = null;
+        setTtsStatus('Finished');
+        setTtsSpeakingState(false, false);
+      };
+      utterance.onerror = () => {
+        ttsUtterance = null;
+        setTtsError('Browser speech failed. Try another voice.');
+        setTtsSpeakingState(false, false);
+      };
+      ttsUtterance = utterance;
+      window.speechSynthesis.speak(utterance);
+      setTtsStatus('Starting speech...');
+      setTtsSpeakingState(true, false);
+    }
+    function readTtsSelection() {
+      const selectedText = getTextSelection(ttsTextEl.value, ttsTextEl.selectionStart, ttsTextEl.selectionEnd);
+      speakTts(selectedText || ttsTextEl.value);
+    }
+    function pauseResumeTts() {
+      if (!ttsSpeaking || !canUseSpeechSynthesis()) return;
+      if (ttsPaused) {
+        window.speechSynthesis.resume();
+        setTtsStatus('Speaking with browser voice.');
+        setTtsSpeakingState(true, false);
+        return;
+      }
+      window.speechSynthesis.pause();
+      setTtsStatus('Paused');
+      setTtsSpeakingState(true, true);
+    }
+    function useTranscriptForTts() {
+      const transcriptText = segments.map(seg => seg.text).join(' ').trim();
+      if (!transcriptText) {
+        setTtsStatus('Transcribe audio first, then use the transcript here.');
+        return;
+      }
+      ttsTextEl.value = transcriptText;
+      setActiveTab('tts');
+      setTtsStatus('Transcript loaded into text reader.');
+      updateTtsControlState();
+    }
 
     function setStatus(message) { statusEl.textContent = message; }
     function setError(message = '') { errorEl.textContent = message; }
@@ -335,8 +956,58 @@
     function updateClock(current, duration) {
       timeLabelEl.textContent = `${formatTime(current || 0)} / ${formatTime(duration || 0)}`;
     }
+    function isLikelyMobileDevice() {
+      if (navigator.userAgentData?.mobile) return true;
+      if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
+      return navigator.maxTouchPoints > 1 && Math.min(window.screen?.width || 0, window.screen?.height || 0) < 900;
+    }
+    function getAudioLimits() {
+      const mobile = isLikelyMobileDevice();
+      return {
+        mobile,
+        maxBytes: mobile ? MOBILE_MAX_AUDIO_FILE_SIZE_BYTES : DESKTOP_MAX_AUDIO_FILE_SIZE_BYTES,
+        maxDuration: mobile ? MOBILE_MAX_AUDIO_DURATION_SECONDS : DESKTOP_MAX_AUDIO_DURATION_SECONDS,
+      };
+    }
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes)) return '0 MB';
+      return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+    }
+    function validateAudioFileSize(file) {
+      const limits = getAudioLimits();
+      if (file.size > limits.maxBytes) {
+        throw new Error(`Audio file is ${formatBytes(file.size)}. Browser transcription is limited to ${formatBytes(limits.maxBytes)} ${limits.mobile ? 'on mobile' : 'in this browser'} for GitHub Pages.`);
+      }
+    }
+    function validateAudioDuration(duration) {
+      if (!Number.isFinite(duration)) return;
+      const limits = getAudioLimits();
+      if (duration > limits.maxDuration) {
+        throw new Error(`Audio is ${formatTime(duration)} long. Browser transcription is limited to ${formatTime(limits.maxDuration)} ${limits.mobile ? 'on mobile' : 'in this browser'} for GitHub Pages.`);
+      }
+    }
+    function clampNumber(value, min, max, fallback) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return fallback;
+      return Math.max(min, Math.min(max, numeric));
+    }
+    function normalizeChunkSettings(rawChunkLength, rawStrideLength) {
+      let chunkLength = clampNumber(rawChunkLength, 10, 28, 24);
+      let strideLength = clampNumber(rawStrideLength, 1, 5, 3);
+      const maxStride = Math.max(0, Math.floor((MAX_ASR_WINDOW_SECONDS - chunkLength) / 2));
+      let adjusted = false;
+      if (strideLength > maxStride) {
+        strideLength = Math.max(0, maxStride);
+        adjusted = true;
+      }
+      return { chunkLength, strideLength, adjusted };
+    }
+    function yieldToBrowser() {
+      return new Promise(resolve => setTimeout(resolve, 0));
+    }
     function pickDevice() {
       if (deviceSelectEl.value !== 'auto') return deviceSelectEl.value;
+      if (isLikelyMobileDevice()) return 'wasm';
       return navigator.gpu ? 'webgpu' : 'wasm';
     }
     function escapeHtml(value) {
@@ -352,41 +1023,65 @@
       const safe = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return escapeHtml(text).replace(new RegExp(safe, 'ig'), m => `<mark>${m}</mark>`);
     }
-    function averageChannels(audioBuffer) {
-      if (audioBuffer.numberOfChannels === 1) return Float32Array.from(audioBuffer.getChannelData(0));
-      const length = audioBuffer.length;
-      const channels = Array.from({ length: audioBuffer.numberOfChannels }, (_, i) => audioBuffer.getChannelData(i));
-      const mixed = new Float32Array(length);
-      for (let i = 0; i < length; i++) {
-        let sum = 0;
-        for (const channel of channels) sum += channel[i];
-        mixed[i] = sum / channels.length;
-      }
-      return mixed;
-    }
-    function resampleLinear(samples, sourceRate, targetRate) {
-      if (sourceRate === targetRate) return Float32Array.from(samples);
-      const ratio = sourceRate / targetRate;
-      const newLength = Math.max(1, Math.round(samples.length / ratio));
-      const output = new Float32Array(newLength);
-      for (let i = 0; i < newLength; i++) {
-        const position = i * ratio;
-        const left = Math.floor(position);
-        const right = Math.min(left + 1, samples.length - 1);
-        const frac = position - left;
-        output[i] = samples[left] * (1 - frac) + samples[right] * frac;
+    async function copySamples(samples) {
+      const output = new Float32Array(samples.length);
+      for (let offset = 0; offset < samples.length; offset += SAMPLE_PROCESS_BATCH_SIZE) {
+        const end = Math.min(samples.length, offset + SAMPLE_PROCESS_BATCH_SIZE);
+        output.set(samples.subarray(offset, end), offset);
+        await yieldToBrowser();
       }
       return output;
     }
-    async function decodeAudioFile(file) {
+    async function averageChannels(audioBuffer) {
+      if (audioBuffer.numberOfChannels === 1) return copySamples(audioBuffer.getChannelData(0));
+      const length = audioBuffer.length;
+      const channels = Array.from({ length: audioBuffer.numberOfChannels }, (_, i) => audioBuffer.getChannelData(i));
+      const mixed = new Float32Array(length);
+      for (let offset = 0; offset < length; offset += SAMPLE_PROCESS_BATCH_SIZE) {
+        const end = Math.min(length, offset + SAMPLE_PROCESS_BATCH_SIZE);
+        for (let i = offset; i < end; i++) {
+          let sum = 0;
+          for (const channel of channels) sum += channel[i];
+          mixed[i] = sum / channels.length;
+        }
+        await yieldToBrowser();
+      }
+      return mixed;
+    }
+    async function resampleLinear(samples, sourceRate, targetRate) {
+      if (sourceRate === targetRate) return copySamples(samples);
+      const ratio = sourceRate / targetRate;
+      const newLength = Math.max(1, Math.round(samples.length / ratio));
+      const output = new Float32Array(newLength);
+      for (let offset = 0; offset < newLength; offset += SAMPLE_PROCESS_BATCH_SIZE) {
+        const end = Math.min(newLength, offset + SAMPLE_PROCESS_BATCH_SIZE);
+        for (let i = offset; i < end; i++) {
+          const position = i * ratio;
+          const left = Math.floor(position);
+          const right = Math.min(left + 1, samples.length - 1);
+          const frac = position - left;
+          output[i] = samples[left] * (1 - frac) + samples[right] * frac;
+        }
+        await yieldToBrowser();
+      }
+      return output;
+    }
+    async function decodeAudioFile(file, onStage = () => {}) {
+      validateAudioFileSize(file);
+      onStage('Reading audio file...');
       const arrayBuffer = await file.arrayBuffer();
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) throw new Error('This browser does not support the Web Audio API.');
       const context = new AudioContextClass();
       try {
-        const decoded = await context.decodeAudioData(arrayBuffer.slice(0));
-        const mono = averageChannels(decoded);
-        return resampleLinear(mono, decoded.sampleRate, TARGET_SAMPLE_RATE);
+        onStage('Decoding audio...');
+        await yieldToBrowser();
+        const decoded = await context.decodeAudioData(arrayBuffer);
+        validateAudioDuration(decoded.duration);
+        onStage('Mixing audio...');
+        const mono = await averageChannels(decoded);
+        onStage('Resampling audio...');
+        return await resampleLinear(mono, decoded.sampleRate, TARGET_SAMPLE_RATE);
       } finally {
         try { await context.close(); } catch (_) {}
       }
@@ -455,6 +1150,24 @@
       }
       return [];
     }
+    function joinsWithoutLeadingSpace(text) {
+      return text.startsWith("'") || text.startsWith(',') || text.startsWith('.') || text.startsWith('!') || text.startsWith('?');
+    }
+    function getMergedSegmentText(leftText, rightText) {
+      const trimmedLeft = leftText.trim();
+      return `${trimmedLeft}${joinsWithoutLeadingSpace(rightText) ? '' : ' '}${rightText}`.trim();
+    }
+    function canMergeSegments(left, right, mergedText = getMergedSegmentText(left.text, right.text)) {
+      const gap = right.start - left.end;
+      const combinedDuration = right.end - left.start;
+      const sentenceBoundary = /[.!?…]$/.test(left.text.trim());
+      return (
+        gap <= READABLE_SEGMENT_GAP_SEC &&
+        !sentenceBoundary &&
+        combinedDuration <= READABLE_SEGMENT_MAX_DURATION_SEC &&
+        mergedText.length <= READABLE_SEGMENT_MAX_TEXT_LEN
+      );
+    }
     function mergeReadableSegments(rawSegments) {
       const normalized = normalizeSegments(rawSegments);
       if (!normalized.length) return [];
@@ -463,19 +1176,9 @@
       for (let i = 1; i < normalized.length; i++) {
         const seg = normalized[i];
         const last = merged[merged.length - 1];
-        const gap = seg.start - last.end;
-        const combinedDuration = seg.end - last.start;
-        const trimmedLast = last.text.trim();
-        const sentenceBoundary = /[.!?…]$/.test(trimmedLast);
-        const mergedText = `${trimmedLast}${seg.text.startsWith("'") || seg.text.startsWith(',') || seg.text.startsWith('.') || seg.text.startsWith('!') || seg.text.startsWith('?') ? '' : ' '}${seg.text}`.trim();
+        const mergedText = getMergedSegmentText(last.text, seg.text);
 
-        const canMerge =
-          gap <= READABLE_SEGMENT_GAP_SEC &&
-          !sentenceBoundary &&
-          combinedDuration <= READABLE_SEGMENT_MAX_DURATION_SEC &&
-          mergedText.length <= READABLE_SEGMENT_MAX_TEXT_LEN;
-
-        if (canMerge) {
+        if (canMergeSegments(last, seg, mergedText)) {
           last.text = mergedText;
           last.end = seg.end;
           continue;
@@ -485,6 +1188,30 @@
       }
 
       return merged;
+    }
+    function appendReadableSegments(nextSegments) {
+      const normalized = normalizeSegments(nextSegments);
+      if (!normalized.length) return { changed: false, changedFrom: segments.length };
+      let changedFrom = segments.length;
+
+      for (const seg of normalized) {
+        if (segments.length) {
+          const lastIndex = segments.length - 1;
+          const last = segments[lastIndex];
+          const mergedText = getMergedSegmentText(last.text, seg.text);
+          if (canMergeSegments(last, seg, mergedText)) {
+            last.text = mergedText;
+            last.end = seg.end;
+            changedFrom = Math.min(changedFrom, lastIndex);
+            continue;
+          }
+        }
+
+        changedFrom = Math.min(changedFrom, segments.length);
+        segments.push({ ...seg });
+      }
+
+      return { changed: true, changedFrom };
     }
     async function getTranscriber() {
       const model = modelSelectEl.value;
@@ -510,9 +1237,42 @@
       currentKey = key;
       return transcriber;
     }
+    function updateSegmentNodeContent(node, seg, index, totalSegments, rawQuery) {
+      node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
+      if (index % 2 === 0 && index < totalSegments - 1) {
+        node.insertAdjacentText('beforeend', ' ');
+      }
+    }
+    function createSegmentNode(seg, index, totalSegments, rawQuery) {
+      const node = document.createElement('span');
+      node.className = 'segment';
+      updateSegmentNodeContent(node, seg, index, totalSegments, rawQuery);
+      node.addEventListener('click', () => {
+        audioEl.currentTime = seg.start;
+        audioEl.play().catch(() => {});
+        updateActiveSegment();
+      });
+      return node;
+    }
+    function getSegmentGroup(index) {
+      const groupIndex = Math.floor(index / 2);
+      let groupEl = transcriptEl.children[groupIndex];
+      if (!groupEl || !groupEl.classList.contains('segment-group')) {
+        groupEl = document.createElement('div');
+        groupEl.className = 'segment-group';
+        transcriptEl.appendChild(groupEl);
+      }
+      return groupEl;
+    }
     function renderTranscript() {
       const query = searchBoxEl.value.trim().toLowerCase();
       filteredSegments = query ? segments.filter(seg => seg.text.toLowerCase().includes(query)) : [...segments];
+      if (debugSession) {
+        debugSession.renderCount = (debugSession.renderCount || 0) + 1;
+        if (debugSession.renderCount <= 12 || debugSession.renderCount % 5 === 0) {
+          appendDebugLog(`renderTranscript #${debugSession.renderCount} (segments=${segments.length}, filtered=${filteredSegments.length})`);
+        }
+      }
       countLabelEl.textContent = `${filteredSegments.length} segment${filteredSegments.length === 1 ? '' : 's'}`;
       if (!filteredSegments.length) {
         transcriptEl.innerHTML = `<div class="empty">${segments.length ? 'No matching lines.' : 'Transcribe an audio file to generate a synced transcript here.'}</div>`;
@@ -529,20 +1289,41 @@
           groupEl.className = 'segment-group';
           transcriptEl.appendChild(groupEl);
         }
-        const node = document.createElement('span');
-        node.className = 'segment';
-        node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
-        if (index % 2 === 0 && index < filteredSegments.length - 1) {
-          node.insertAdjacentText('beforeend', ' ');
-        }
-        node.addEventListener('click', () => {
-          audioEl.currentTime = seg.start;
-          audioEl.play().catch(() => {});
-          updateActiveSegment();
-        });
+        const node = createSegmentNode(seg, index, filteredSegments.length, rawQuery);
         groupEl?.appendChild(node);
         return node;
       });
+      updateActiveSegment();
+    }
+    function renderTranscriptIncremental(changedFrom = 0) {
+      const rawQuery = searchBoxEl.value.trim();
+      if (rawQuery) {
+        renderTranscript();
+        return;
+      }
+      filteredSegments = [...segments];
+      countLabelEl.textContent = `${filteredSegments.length} segment${filteredSegments.length === 1 ? '' : 's'}`;
+      if (!filteredSegments.length) {
+        renderTranscript();
+        return;
+      }
+      if (!segmentNodes.length || transcriptEl.querySelector('.empty')) {
+        transcriptEl.innerHTML = '';
+      }
+      const lastIndex = Math.max(0, filteredSegments.length - 1);
+      const startIndex = Math.max(0, Math.min(changedFrom > 0 ? changedFrom - 1 : 0, lastIndex));
+      for (let index = startIndex; index < filteredSegments.length; index++) {
+        const seg = filteredSegments[index];
+        let node = segmentNodes[index];
+        if (!node) {
+          node = createSegmentNode(seg, index, filteredSegments.length, rawQuery);
+          segmentNodes[index] = node;
+          getSegmentGroup(index).appendChild(node);
+        } else {
+          updateSegmentNodeContent(node, seg, index, filteredSegments.length, rawQuery);
+        }
+      }
+      segmentNodes.length = filteredSegments.length;
       updateActiveSegment();
     }
     function findActiveSegmentIndex(time) {
@@ -568,6 +1349,10 @@
       return -1;
     }
     function updateActiveSegment() {
+      activeUpdateCount += 1;
+      if (debugSession && activeUpdateCount % 200 === 0) {
+        appendDebugLog(`updateActiveSegment count=${activeUpdateCount}`);
+      }
       if (!segmentNodes.length) return;
       const nextActive = findActiveSegmentIndex(audioEl.currentTime || 0);
       if (nextActive === activeIndex) {
@@ -595,18 +1380,19 @@
       setDownloadReady(ready);
     }
     function appendTranscriptData(nextSegments, chunkIndex, totalChunks) {
-      if (nextSegments.length) {
-        segments.push(...nextSegments);
+      const beforeCount = segments.length;
+      if (debugSession) {
+        appendDebugLog(`append chunk ${chunkIndex}/${totalChunks}: incoming=${nextSegments.length}, before=${beforeCount}`);
       }
-      if (!segments.length) {
-        segments = [];
-        setTranscriptData(segments);
-      } else {
-        segments = mergeReadableSegments(segments);
+      const result = appendReadableSegments(nextSegments);
+      if (result.changed) {
+        renderTranscriptIncremental(result.changedFrom);
+      } else if (!segments.length) {
         renderTranscript();
       }
-      const ready = segments.length > 0;
-      setDownloadReady(ready);
+      if (debugSession) {
+        appendDebugLog(`append chunk ${chunkIndex}/${totalChunks}: after merge ${beforeCount} -> ${segments.length}`);
+      }
       if (chunkIndex != null && totalChunks != null) {
         setProgress(Math.round((chunkIndex / totalChunks) * 100), `Transcribing chunk ${chunkIndex} / ${totalChunks}`);
       }
@@ -654,7 +1440,7 @@
           windowStart,
           windowStartSec: windowStart / TARGET_SAMPLE_RATE,
           windowEndSec: windowEnd / TARGET_SAMPLE_RATE,
-          chunkAudio: audioData => audioData.slice(windowStart, windowEnd),
+          chunkAudio: audioData => audioData.subarray(windowStart, windowEnd),
         });
       }
       return windows;
@@ -685,20 +1471,45 @@
       const model = modelSelectEl.value;
       const device = pickDevice();
       const dtype = dtypeSelectEl.value;
-      const chunkLength = Math.max(10, Number(chunkLengthEl.value) || 29);
-      const strideLength = Math.max(1, Number(strideLengthEl.value) || 5);
+      const chunkSettings = normalizeChunkSettings(chunkLengthEl.value, strideLengthEl.value);
+      const { chunkLength, strideLength } = chunkSettings;
       const timestampMode = timestampModeEl.value;
+      const decodeStart = performance.now();
+      debugSession = {
+        job: localJob,
+        startedAt: performance.now(),
+        audioDecodeMs: 0,
+        modelLoadMs: 0,
+        renderCount: 0,
+      };
+      clearDebugLog();
+      if (isDebugEnabled()) {
+        appendDebugLog(`session ${localJob} start`);
+        appendDebugLog(`settings file=${file.name} model=${model} device=${device} dtype=${dtype} chunkLength=${chunkLength} stride=${strideLength} timestampMode=${timestampMode}`);
+      }
 
       setBusy(true);
       setError('');
       setSuccess('');
       setWarning('');
+      setDownloadReady(false);
+      activeUpdateCount = 0;
+      if (chunkSettings.adjusted) {
+        chunkLengthEl.value = String(chunkLength);
+        strideLengthEl.value = String(strideLength);
+        setWarning(`Chunk settings were adjusted to keep each browser ASR window under ${MAX_ASR_WINDOW_SECONDS}s.`);
+      }
       setStatus('Preparing audio...');
       setProgress(0, 'Decoding audio...');
       modelLabelEl.textContent = `Model: ${model.split('/').pop()} | ${device} | ${dtype}`;
 
       try {
-        const audioData = await decodeAudioFile(file);
+        validateAudioDuration(audioEl.duration);
+        const audioData = await decodeAudioFile(file, label => setProgress(0, label));
+        debugSession.audioDecodeMs = performance.now() - decodeStart;
+        if (isDebugEnabled()) {
+          appendDebugLog(`audio decoded in ${toFixedOrZero(debugSession.audioDecodeMs)} ms (${audioData.length} samples, ${(audioData.length / TARGET_SAMPLE_RATE).toFixed(2)}s)`);
+        }
         if (localJob !== jobNonce) return;
 
         if (dtype !== 'fp32') {
@@ -706,6 +1517,10 @@
         }
 
         const asr = await getTranscriber();
+        debugSession.modelLoadMs = performance.now() - (debugSession.startedAt || decodeStart);
+        if (isDebugEnabled()) {
+          appendDebugLog(`model ready in ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
+        }
         if (localJob !== jobNonce) return;
 
         setStatus('Running transcription...');
@@ -719,6 +1534,7 @@
         renderTranscript();
         for (let i = 0; i < totalChunks; i++) {
           if (localJob !== jobNonce) return;
+          const chunkStart = performance.now();
           const {
             centralStart,
             centralEnd,
@@ -727,13 +1543,18 @@
             chunkAudio,
           } = chunkWindows[i];
           streamHorizonTime = Math.max(streamHorizonTime, centralEnd);
+          if (isDebugEnabled()) {
+            appendDebugLog(`chunk ${i + 1}/${totalChunks}: window [${centralStart.toFixed(2)}, ${centralEnd.toFixed(2)}], strideWindowStart=${windowStartSec.toFixed(2)}`);
+          }
           try {
             const windowData = chunkAudio(audioData);
+            const asrStart = performance.now();
             const output = await asr(windowData, {
-              chunk_length_s: chunkLength,
-              stride_length_s: strideLength,
               return_timestamps: timestampMode === 'word' ? 'word' : true,
             });
+            if (isDebugEnabled()) {
+              appendDebugLog(`chunk ${i + 1}/${totalChunks} ASR time ${toFixedOrZero(performance.now() - asrStart)} ms`);
+            }
             if (localJob !== jobNonce) return;
             const chunkSegments = alignChunkSegments(
               outputToSegments(output, timestampMode),
@@ -741,7 +1562,13 @@
               centralStart,
               centralEnd,
             );
+            if (isDebugEnabled()) {
+              appendDebugLog(`chunk ${i + 1}/${totalChunks} aligned ${chunkSegments.length} segments`);
+            }
             appendTranscriptData(chunkSegments, i + 1, totalChunks);
+            if (isDebugEnabled()) {
+              appendDebugLog(`chunk ${i + 1}/${totalChunks} loop wall time ${toFixedOrZero(performance.now() - chunkStart)} ms`);
+            }
           } catch (err) {
             failedChunks += 1;
             console.error(err);
@@ -760,6 +1587,11 @@
         if (failedChunks) {
           setWarning(`${failedChunks} chunk${failedChunks === 1 ? '' : 's'} failed while transcribing.`);
         }
+        setDownloadReady(true);
+        if (isDebugEnabled() && debugSession) {
+          appendDebugLog(`session ${localJob} completed in ${toFixedOrZero(performance.now() - debugSession.startedAt)} ms`);
+          appendDebugLog(`render passes: ${debugSession.renderCount || 0}, decode ${toFixedOrZero(debugSession.audioDecodeMs)} ms, model ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
+        }
       } catch (error) {
         if (localJob !== jobNonce) return;
         console.error(error);
@@ -770,6 +1602,10 @@
         }
         setStatus('Transcription did not complete.');
         setIdleProgress('Failed');
+        setDownloadReady(false);
+        if (isDebugEnabled() && debugSession) {
+          appendDebugLog(`session ${localJob} failed after ${toFixedOrZero(performance.now() - debugSession.startedAt)} ms: ${message}`);
+        }
       } finally {
         streamActive = false;
         streamHorizonTime = 0;
@@ -779,6 +1615,8 @@
     function resetAll() {
       jobNonce += 1;
       setBusy(false);
+      debugSession = null;
+      clearDebugLog();
       setIdleProgress('Idle');
       setStatus('Reset.');
       setError('');
@@ -834,8 +1672,71 @@
       }
     });
 
+    transcribeTabEl.addEventListener('click', () => setActiveTab('transcribe'));
+    ttsTabEl.addEventListener('click', () => {
+      setActiveTab('tts');
+      loadTtsVoices();
+    });
+    themeToggleBtn.addEventListener('click', () => {
+      const nextTheme = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+      applyTheme(nextTheme);
+    });
+    ttsTextEl.addEventListener('input', updateTtsControlState);
+    ttsVoiceTriggerBtn.addEventListener('click', () => {
+      if (ttsVoiceTriggerBtn.disabled) return;
+      const willOpen = ttsVoiceMenuEl.hidden;
+      setTtsVoiceMenuOpen(willOpen);
+      if (!willOpen) closeTtsVoiceMenu(true);
+    });
+    ttsVoiceSearchInputEl.addEventListener('input', () => {
+      ttsVoiceSearch = ttsVoiceSearchInputEl.value.trim();
+      renderTtsVoiceOptions();
+    });
+    ttsVoiceSearchInputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeTtsVoiceMenu(true);
+        ttsVoiceTriggerBtn.focus();
+      }
+    });
+    ttsReloadVoicesBtn.addEventListener('click', loadTtsVoices);
+    ttsReadAllBtn.addEventListener('click', () => speakTts(ttsTextEl.value));
+    ttsReadSelectionBtn.addEventListener('click', readTtsSelection);
+    ttsUseTranscriptBtn.addEventListener('click', useTranscriptForTts);
+    ttsPauseResumeBtn.addEventListener('click', pauseResumeTts);
+    ttsStopBtn.addEventListener('click', stopTts);
+    [ttsRateEl, ttsPitchEl, ttsVolumeEl].forEach(input => input.addEventListener('input', updateTtsRangeLabels));
+    if (canUseSpeechSynthesis()) {
+      loadTtsVoices();
+      if (typeof window.speechSynthesis.addEventListener === 'function') {
+        window.speechSynthesis.addEventListener('voiceschanged', loadTtsVoices);
+      } else {
+        window.speechSynthesis.onvoiceschanged = loadTtsVoices;
+      }
+    } else {
+      renderTtsVoiceOptions();
+    }
+    document.addEventListener('click', (event) => {
+      if (ttsVoiceMenuEl.hidden) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (target === ttsVoiceTriggerBtn || ttsVoiceTriggerBtn.contains(target)) return;
+      if (ttsVoiceMenuEl.contains(target)) return;
+      closeTtsVoiceMenu(true);
+    });
+
+    loadSavedTheme();
+    updateTtsRangeLabels();
+    updateTtsControlState();
     updateTimestampHint();
     setDownloadReady(false);
+    if (debugLogToggleEl) {
+      if (debugLogToggleLabelEl) debugLogToggleLabelEl.hidden = !debugControlsAllowed;
+      debugLogToggleEl.checked = debugControlsAllowed;
+      debugLogToggleEl.addEventListener('change', () => {
+        if (!debugLogEl) return;
+        debugLogEl.style.display = debugLogToggleEl.checked ? 'block' : 'none';
+      });
+    }
     updateClock(0, 0);
     setIdleProgress('Idle');
   </script>
