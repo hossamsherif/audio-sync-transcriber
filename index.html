@@ -133,13 +133,115 @@
     .timestamp-hint { margin-top: 6px; }
     .topline { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
     .topline .sub { margin-bottom: 0; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
     .tabs { display: inline-flex; gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--soft); }
     .tab-btn { background: transparent; color: var(--muted); border: 0; padding: 8px 12px; }
     .tab-btn.active { background: var(--accent); color: #081127; }
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .icon-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
     .app-panel[hidden] { display: none; }
     .tts-grid { grid-template-columns: minmax(0, 1fr) 360px; }
     .tts-textarea { min-height: 420px; resize: vertical; line-height: 1.65; }
     .tts-controls { display: grid; gap: 14px; }
+    .tts-voice-tools { display: grid; gap: 10px; }
+    .tts-voice-picker { position: relative; }
+    .tts-voice-trigger {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      text-align: left;
+    }
+    .tts-voice-trigger-text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tts-voice-caret {
+      flex: 0 0 auto;
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+      opacity: .75;
+    }
+    .tts-voice-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 16px 36px var(--shadow);
+      overflow: hidden;
+    }
+    .tts-voice-menu-head {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .tts-voice-options {
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 6px;
+      display: grid;
+      gap: 4px;
+    }
+    .tts-voice-option {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      padding: 10px 12px;
+      text-align: left;
+      display: grid;
+      gap: 2px;
+    }
+    .tts-voice-option:hover { background: var(--soft-hover); }
+    .tts-voice-option.active {
+      background: var(--soft);
+      border-color: var(--line);
+    }
+    .tts-voice-option-name {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .tts-voice-option-meta {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .tts-voice-empty {
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .tts-voice-menu-meta {
+      padding: 0 12px 12px;
+    }
     .tts-range-row { display: grid; grid-template-columns: 78px 1fr 52px; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
     .tts-range-row input[type="range"] { width: 100%; accent-color: var(--accent); }
     .tts-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -174,7 +276,8 @@
       .tts-grid { grid-template-columns: 1fr; }
       .twocol { grid-template-columns: 1fr; }
       .topline { display: block; }
-      .tabs { margin-top: 14px; width: 100%; }
+      .top-actions { margin-top: 14px; }
+      .tabs { width: 100%; }
       .tab-btn { flex: 1; }
     }
   </style>
@@ -186,9 +289,27 @@
         <h1>Browser Audio Studio</h1>
         <p class="sub">Transcribe audio, sync playback, and read text aloud with browser-first tools that work on GitHub Pages.</p>
       </div>
-      <div class="tabs" role="tablist" aria-label="Audio tools">
-        <button id="transcribeTab" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="transcribePanel">Transcribe</button>
-        <button id="ttsTab" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="ttsPanel">Text to speech</button>
+      <div class="top-actions">
+        <div class="tabs" role="tablist" aria-label="Audio tools">
+          <button id="transcribeTab" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="transcribePanel">Transcribe</button>
+          <button id="ttsTab" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="ttsPanel">Text to speech</button>
+        </div>
+        <button id="themeToggleBtn" class="icon-btn" type="button" aria-label="Switch to light theme" title="Switch to light theme">
+          <svg id="themeToggleSun" viewBox="0 0 24 24" hidden>
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2.5"></path>
+            <path d="M12 19.5V22"></path>
+            <path d="M4.93 4.93l1.77 1.77"></path>
+            <path d="M17.3 17.3l1.77 1.77"></path>
+            <path d="M2 12h2.5"></path>
+            <path d="M19.5 12H22"></path>
+            <path d="M4.93 19.07l1.77-1.77"></path>
+            <path d="M17.3 6.7l1.77-1.77"></path>
+          </svg>
+          <svg id="themeToggleMoon" viewBox="0 0 24 24">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -331,14 +452,6 @@
           <div class="card-head"><h2>Voice Controls</h2></div>
           <div class="card-body tts-controls">
             <div>
-              <label for="ttsThemeSelect">Theme</label>
-              <select id="ttsThemeSelect">
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-              </select>
-            </div>
-
-            <div>
               <label for="ttsEngineSelect">Speech engine</label>
               <select id="ttsEngineSelect">
                 <option value="browser">Browser voices</option>
@@ -347,10 +460,24 @@
             </div>
 
             <div>
-              <label for="ttsVoiceSelect">Browser voice</label>
-              <div class="btns">
-                <select id="ttsVoiceSelect"></select>
-                <button id="ttsReloadVoicesBtn" class="secondary" type="button" title="Reload voices">Reload</button>
+              <label for="ttsVoiceTriggerBtn">Browser voice</label>
+              <div class="tts-voice-tools">
+                <div class="btns">
+                  <div class="tts-voice-picker">
+                    <button id="ttsVoiceTriggerBtn" class="tts-voice-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                      <span id="ttsVoiceTriggerText" class="tts-voice-trigger-text">Loading browser voices...</span>
+                      <span class="tts-voice-caret" aria-hidden="true"></span>
+                    </button>
+                    <div id="ttsVoiceMenu" class="tts-voice-menu" hidden>
+                      <div class="tts-voice-menu-head">
+                        <input id="ttsVoiceSearchInput" type="text" placeholder="Search voices by name or language" />
+                      </div>
+                      <div id="ttsVoiceOptions" class="tts-voice-options" role="listbox" aria-label="Browser voices"></div>
+                      <div id="ttsVoiceSearchMeta" class="smallnote tts-voice-menu-meta"></div>
+                    </div>
+                  </div>
+                  <button id="ttsReloadVoicesBtn" class="secondary" type="button" title="Reload voices">Reload</button>
+                </div>
               </div>
             </div>
 
@@ -443,10 +570,17 @@
     const ttsTabEl = document.getElementById('ttsTab');
     const transcribePanelEl = document.getElementById('transcribePanel');
     const ttsPanelEl = document.getElementById('ttsPanel');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeToggleSunEl = document.getElementById('themeToggleSun');
+    const themeToggleMoonEl = document.getElementById('themeToggleMoon');
     const ttsTextEl = document.getElementById('ttsText');
-    const ttsThemeSelectEl = document.getElementById('ttsThemeSelect');
     const ttsEngineSelectEl = document.getElementById('ttsEngineSelect');
-    const ttsVoiceSelectEl = document.getElementById('ttsVoiceSelect');
+    const ttsVoiceTriggerBtn = document.getElementById('ttsVoiceTriggerBtn');
+    const ttsVoiceTriggerTextEl = document.getElementById('ttsVoiceTriggerText');
+    const ttsVoiceMenuEl = document.getElementById('ttsVoiceMenu');
+    const ttsVoiceSearchInputEl = document.getElementById('ttsVoiceSearchInput');
+    const ttsVoiceOptionsEl = document.getElementById('ttsVoiceOptions');
+    const ttsVoiceSearchMetaEl = document.getElementById('ttsVoiceSearchMeta');
     const ttsReloadVoicesBtn = document.getElementById('ttsReloadVoicesBtn');
     const ttsReadAllBtn = document.getElementById('ttsReadAllBtn');
     const ttsReadSelectionBtn = document.getElementById('ttsReadSelectionBtn');
@@ -480,6 +614,7 @@
     let ttsUtterance = null;
     let ttsSpeaking = false;
     let ttsPaused = false;
+    let ttsVoiceSearch = '';
     const debugControlsAllowed = new URLSearchParams(window.location.search).get('debug') === '1';
 
     function isDebugEnabled() { return debugControlsAllowed && Boolean(debugLogToggleEl?.checked); }
@@ -520,7 +655,14 @@
     function applyTheme(theme) {
       const nextTheme = theme === 'light' ? 'light' : 'dark';
       document.body.classList.toggle('theme-light', nextTheme === 'light');
-      if (ttsThemeSelectEl) ttsThemeSelectEl.value = nextTheme;
+      if (themeToggleSunEl) themeToggleSunEl.hidden = nextTheme !== 'light';
+      if (themeToggleMoonEl) themeToggleMoonEl.hidden = nextTheme === 'light';
+      if (themeToggleBtn) {
+        const nextLabel = nextTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
+        themeToggleBtn.setAttribute('aria-label', nextLabel);
+        themeToggleBtn.title = nextLabel;
+        themeToggleBtn.dataset.theme = nextTheme;
+      }
       try { localStorage.setItem('audioStudioTheme', nextTheme); } catch (_) {}
     }
     function loadSavedTheme() {
@@ -561,12 +703,46 @@
     function getSelectedTtsVoice() {
       return ttsVoices.find(voice => voice.voiceURI === ttsVoiceURI) || ttsVoices[0] || null;
     }
+    function setTtsVoiceMenuOpen(open) {
+      if (!ttsVoiceMenuEl || !ttsVoiceTriggerBtn) return;
+      ttsVoiceMenuEl.hidden = !open;
+      ttsVoiceTriggerBtn.setAttribute('aria-expanded', String(open));
+      if (open && ttsVoiceSearchInputEl) {
+        ttsVoiceSearchInputEl.value = ttsVoiceSearch;
+        requestAnimationFrame(() => ttsVoiceSearchInputEl.focus());
+      }
+    }
+    function clearTtsVoiceSearch() {
+      ttsVoiceSearch = '';
+      if (ttsVoiceSearchInputEl) ttsVoiceSearchInputEl.value = '';
+    }
+    function closeTtsVoiceMenu(resetSearch = false) {
+      if (resetSearch) {
+        clearTtsVoiceSearch();
+        renderTtsVoiceOptions();
+      }
+      setTtsVoiceMenuOpen(false);
+    }
+    function getFilteredTtsVoices() {
+      const query = ttsVoiceSearch.trim().toLowerCase();
+      if (!query) return [...ttsVoices];
+      return ttsVoices.filter(voice =>
+        voice.name.toLowerCase().includes(query) ||
+        voice.lang.toLowerCase().includes(query) ||
+        voice.voiceURI.toLowerCase().includes(query)
+      );
+    }
     function updateTtsCurrentVoice() {
       const selectedVoice = getSelectedTtsVoice();
       if (!ttsCurrentVoiceEl) return;
       ttsCurrentVoiceEl.textContent = selectedVoice
         ? `Voice: ${selectedVoice.name} (${selectedVoice.lang})`
         : 'Voice: no browser voice selected';
+      if (ttsVoiceTriggerTextEl) {
+        ttsVoiceTriggerTextEl.textContent = selectedVoice
+          ? `${selectedVoice.name} - ${selectedVoice.lang}`
+          : 'No browser voice selected';
+      }
     }
     function updateTtsControlState() {
       const supported = canUseSpeechSynthesis();
@@ -576,39 +752,69 @@
       ttsPauseResumeBtn.disabled = !ttsSpeaking;
       ttsStopBtn.disabled = !ttsSpeaking;
       ttsPauseResumeBtn.textContent = ttsPaused ? 'Resume' : 'Pause';
-      ttsVoiceSelectEl.disabled = !supported || !ttsVoices.length;
+      ttsVoiceTriggerBtn.disabled = !supported || !ttsVoices.length;
       ttsReloadVoicesBtn.disabled = !supported;
+      if ((!supported || !ttsVoices.length) && ttsVoiceMenuEl && !ttsVoiceMenuEl.hidden) closeTtsVoiceMenu(true);
     }
     function renderTtsVoiceOptions() {
-      if (!ttsVoiceSelectEl) return;
-      ttsVoiceSelectEl.innerHTML = '';
+      if (!ttsVoiceOptionsEl) return;
+      ttsVoiceOptionsEl.innerHTML = '';
       if (!canUseSpeechSynthesis()) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'Speech synthesis is not supported';
-        ttsVoiceSelectEl.appendChild(option);
+        ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">Speech synthesis is not supported</div>';
         setTtsStatus('Your browser does not support text to speech.');
         updateTtsCurrentVoice();
         updateTtsControlState();
         return;
       }
       if (!ttsVoices.length) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'No voices loaded yet';
-        ttsVoiceSelectEl.appendChild(option);
+        ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">No voices loaded yet</div>';
         setTtsStatus('Browser voices are still loading. Try Reload if the list stays empty.');
         updateTtsCurrentVoice();
         updateTtsControlState();
         return;
       }
-      for (const voice of ttsVoices) {
-        const option = document.createElement('option');
-        option.value = voice.voiceURI;
-        option.textContent = `${scoreTtsVoice(voice) >= 50 ? 'Natural - ' : ''}${voice.name} - ${voice.lang}`;
-        ttsVoiceSelectEl.appendChild(option);
+      const filteredVoices = getFilteredTtsVoices();
+      const selectedVoice = getSelectedTtsVoice();
+      const visibleVoices = [...filteredVoices];
+      if (ttsVoiceSearch && selectedVoice && !filteredVoices.some(voice => voice.voiceURI === selectedVoice.voiceURI)) {
+        visibleVoices.unshift(selectedVoice);
       }
-      ttsVoiceSelectEl.value = ttsVoiceURI;
+      if (!visibleVoices.length) {
+        ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">No voices match this search</div>';
+        if (ttsVoiceSearchMetaEl) ttsVoiceSearchMetaEl.textContent = '0 matching voices';
+        updateTtsCurrentVoice();
+        updateTtsControlState();
+        return;
+      }
+      for (const voice of visibleVoices) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = `tts-voice-option${voice.voiceURI === ttsVoiceURI ? ' active' : ''}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(voice.voiceURI === ttsVoiceURI));
+        const isPinnedCurrent = Boolean(ttsVoiceSearch && selectedVoice && voice.voiceURI === selectedVoice.voiceURI && !filteredVoices.some(item => item.voiceURI === voice.voiceURI));
+        const badge = isPinnedCurrent ? 'Current' : scoreTtsVoice(voice) >= 50 ? 'Natural' : '';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'tts-voice-option-name';
+        nameEl.textContent = `${badge ? `${badge} - ` : ''}${voice.name}`;
+        const metaEl = document.createElement('span');
+        metaEl.className = 'tts-voice-option-meta';
+        metaEl.textContent = voice.lang;
+        option.appendChild(nameEl);
+        option.appendChild(metaEl);
+        option.addEventListener('click', () => {
+          ttsVoiceURI = voice.voiceURI;
+          updateTtsCurrentVoice();
+          renderTtsVoiceOptions();
+          closeTtsVoiceMenu(true);
+        });
+        ttsVoiceOptionsEl.appendChild(option);
+      }
+      if (ttsVoiceSearchMetaEl) {
+        ttsVoiceSearchMetaEl.textContent = ttsVoiceSearch
+          ? `${filteredVoices.length} matching voice${filteredVoices.length === 1 ? '' : 's'}`
+          : `${ttsVoices.length} available voice${ttsVoices.length === 1 ? '' : 's'}`;
+      }
       setTtsStatus('Ready');
       updateTtsCurrentVoice();
       updateTtsControlState();
@@ -1471,11 +1677,26 @@
       setActiveTab('tts');
       loadTtsVoices();
     });
-    ttsThemeSelectEl.addEventListener('change', () => applyTheme(ttsThemeSelectEl.value));
+    themeToggleBtn.addEventListener('click', () => {
+      const nextTheme = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+      applyTheme(nextTheme);
+    });
     ttsTextEl.addEventListener('input', updateTtsControlState);
-    ttsVoiceSelectEl.addEventListener('change', () => {
-      ttsVoiceURI = ttsVoiceSelectEl.value;
-      updateTtsCurrentVoice();
+    ttsVoiceTriggerBtn.addEventListener('click', () => {
+      if (ttsVoiceTriggerBtn.disabled) return;
+      const willOpen = ttsVoiceMenuEl.hidden;
+      setTtsVoiceMenuOpen(willOpen);
+      if (!willOpen) closeTtsVoiceMenu(true);
+    });
+    ttsVoiceSearchInputEl.addEventListener('input', () => {
+      ttsVoiceSearch = ttsVoiceSearchInputEl.value.trim();
+      renderTtsVoiceOptions();
+    });
+    ttsVoiceSearchInputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeTtsVoiceMenu(true);
+        ttsVoiceTriggerBtn.focus();
+      }
     });
     ttsReloadVoicesBtn.addEventListener('click', loadTtsVoices);
     ttsReadAllBtn.addEventListener('click', () => speakTts(ttsTextEl.value));
@@ -1494,6 +1715,14 @@
     } else {
       renderTtsVoiceOptions();
     }
+    document.addEventListener('click', (event) => {
+      if (ttsVoiceMenuEl.hidden) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (target === ttsVoiceTriggerBtn || ttsVoiceTriggerBtn.contains(target)) return;
+      if (ttsVoiceMenuEl.contains(target)) return;
+      closeTtsVoiceMenu(true);
+    });
 
     loadSavedTheme();
     updateTtsRangeLabels();
