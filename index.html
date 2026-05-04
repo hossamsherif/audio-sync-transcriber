@@ -17,41 +17,62 @@
       --success: #9bffcf;
       --error: #ff8d8d;
       --warning: #ffd37a;
+      --shadow: rgba(0, 0, 0, 0.25);
+      --soft: rgba(255,255,255,.02);
+      --soft-hover: rgba(255,255,255,.04);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: var(--text);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0b1020 0%, #10162b 100%);
+      background: linear-gradient(180deg, var(--bg) 0%, #10162b 100%);
+      transition: background .18s ease, color .18s ease;
+    }
+    body.theme-light {
+      --bg: #eef3f8;
+      --panel: #ffffff;
+      --panel-2: #f5f8fc;
+      --text: #172033;
+      --muted: #5f6f86;
+      --accent: #2368d8;
+      --line: #d8e1ee;
+      --active: #e7efff;
+      --success: #096b46;
+      --error: #b42318;
+      --warning: #946200;
+      --shadow: rgba(34, 48, 74, 0.12);
+      --soft: rgba(35, 104, 216, .04);
+      --soft-hover: rgba(35, 104, 216, .08);
+      background: linear-gradient(180deg, #eef3f8 0%, #f8fbff 100%);
     }
     .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
     h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.15; }
     .sub { margin: 0 0 20px; color: var(--muted); font-size: 15px; line-height: 1.5; }
     .grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
     .card {
-      background: rgba(18, 25, 51, 0.92);
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 18px;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 14px 40px var(--shadow);
       overflow: hidden;
     }
     .card-head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
     .card-head h2 { margin: 0; font-size: 16px; }
     .card-body { padding: 16px 18px; }
     .row { margin-bottom: 16px; }
-    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #d8e0ff; }
+    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
     input[type="file"], input[type="text"], select, textarea, input[type="number"] {
-      width: 100%; background: var(--panel-2); border: 1px solid #32406f; color: var(--text);
-      border-radius: 12px; padding: 10px 12px; font: inherit;
-    }
+	      width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+	      border-radius: 12px; padding: 10px 12px; font: inherit;
+	    }
     button {
       border: 0; background: var(--accent); color: #081127; padding: 10px 14px; border-radius: 999px;
       font: inherit; font-weight: 700; cursor: pointer; transition: transform .14s ease, opacity .14s ease;
     }
     button:hover { transform: translateY(-1px); }
     button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
-    button.secondary { background: #1d2852; color: var(--text); border: 1px solid #314172; }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
     .btns { display: flex; flex-wrap: wrap; gap: 10px; }
     .download-row { align-items: center; flex-wrap: wrap; }
     .download-row select { width: auto; min-width: 170px; }
@@ -62,13 +83,13 @@
     .warning { color: var(--warning); }
     .chips { display: flex; gap: 8px; flex-wrap: wrap; }
     .chip {
-      padding: 6px 10px; border-radius: 999px; background: #1d2852; color: var(--muted);
-      border: 1px solid #30406d; font-size: 12px;
-    }
-    .status-box {
-      border: 1px solid var(--line); border-radius: 14px; padding: 12px;
-      background: rgba(255,255,255,.02); margin-top: 10px;
-    }
+	      padding: 6px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted);
+	      border: 1px solid var(--line); font-size: 12px;
+	    }
+	    .status-box {
+	      border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+	      background: var(--soft); margin-top: 10px;
+	    }
     progress { width: 100%; height: 10px; margin-top: 8px; }
     audio { width: 100%; margin-bottom: 16px; }
     .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
@@ -77,7 +98,7 @@
     .toolbar .inline-check input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
     .transcript {
       border: 1px solid var(--line); border-radius: 16px;
-      background: rgba(255,255,255,.02);
+	      background: var(--soft);
       padding: 16px;
       min-height: 320px;
       max-height: 56vh;
@@ -100,7 +121,7 @@
     .segment-group:last-child {
       margin-bottom: 0;
     }
-    .segment:hover { background: rgba(255,255,255,.04); }
+    .segment:hover { background: var(--soft-hover); }
     .segment.active {
       color: #fefefe;
     }
@@ -110,6 +131,29 @@
     .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .smallnote { font-size: 12px; color: var(--muted); }
     .timestamp-hint { margin-top: 6px; }
+    .topline { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+    .topline .sub { margin-bottom: 0; }
+    .tabs { display: inline-flex; gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--soft); }
+    .tab-btn { background: transparent; color: var(--muted); border: 0; padding: 8px 12px; }
+    .tab-btn.active { background: var(--accent); color: #081127; }
+    .app-panel[hidden] { display: none; }
+    .tts-grid { grid-template-columns: minmax(0, 1fr) 360px; }
+    .tts-textarea { min-height: 420px; resize: vertical; line-height: 1.65; }
+    .tts-controls { display: grid; gap: 14px; }
+    .tts-range-row { display: grid; grid-template-columns: 78px 1fr 52px; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
+    .tts-range-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .tts-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tts-actions button { width: 100%; }
+    .tts-status { min-height: 42px; }
+    .mode-note {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--soft);
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
     .debug-log {
       margin-top: 8px;
       padding: 10px;
@@ -127,16 +171,29 @@
     .debug-log-entry { margin: 0; }
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
+      .tts-grid { grid-template-columns: 1fr; }
       .twocol { grid-template-columns: 1fr; }
+      .topline { display: block; }
+      .tabs { margin-top: 14px; width: 100%; }
+      .tab-btn { flex: 1; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Browser Transcriber + Sync Player</h1>
-    <p class="sub">This version avoids the broken quantized ONNX path by loading Whisper in full precision by default. It transcribes in your browser, then syncs and highlights the transcript while audio plays.</p>
+    <div class="topline">
+      <div>
+        <h1>Browser Audio Studio</h1>
+        <p class="sub">Transcribe audio, sync playback, and read text aloud with browser-first tools that work on GitHub Pages.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Audio tools">
+        <button id="transcribeTab" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="transcribePanel">Transcribe</button>
+        <button id="ttsTab" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="ttsPanel">Text to speech</button>
+      </div>
+    </div>
 
-    <div class="grid">
+    <section id="transcribePanel" class="app-panel" role="tabpanel" aria-labelledby="transcribeTab">
+      <div class="grid">
       <section class="card">
         <div class="card-head"><h2>Transcribe</h2></div>
         <div class="card-body">
@@ -250,7 +307,83 @@
           <div id="debugLog" class="debug-log" aria-live="polite"></div>
         </div>
       </section>
-    </div>
+      </div>
+    </section>
+
+    <section id="ttsPanel" class="app-panel" role="tabpanel" aria-labelledby="ttsTab" hidden>
+      <div class="grid tts-grid">
+        <section class="card">
+          <div class="card-head"><h2>Text to Speech</h2></div>
+          <div class="card-body">
+            <div class="row">
+              <label for="ttsText">Text</label>
+              <textarea id="ttsText" class="tts-textarea" placeholder="Paste or type text here. Select part of it to read only that section.">Paste or type your text here. You can also select part of the text and click Read Selection.</textarea>
+            </div>
+            <div class="btns">
+              <button id="ttsReadAllBtn" type="button">Read All</button>
+              <button id="ttsReadSelectionBtn" class="secondary" type="button">Read Selection</button>
+              <button id="ttsUseTranscriptBtn" class="secondary" type="button">Use Transcript</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>Voice Controls</h2></div>
+          <div class="card-body tts-controls">
+            <div>
+              <label for="ttsThemeSelect">Theme</label>
+              <select id="ttsThemeSelect">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="ttsEngineSelect">Speech engine</label>
+              <select id="ttsEngineSelect">
+                <option value="browser">Browser voices</option>
+              </select>
+              <div class="hint">Provider audio and local Piper models need extra runtime or backend setup, so this GitHub Pages version uses browser voices by default.</div>
+            </div>
+
+            <div>
+              <label for="ttsVoiceSelect">Browser voice</label>
+              <div class="btns">
+                <select id="ttsVoiceSelect"></select>
+                <button id="ttsReloadVoicesBtn" class="secondary" type="button" title="Reload voices">Reload</button>
+              </div>
+            </div>
+
+            <div class="tts-range-row">
+              <span>Speed</span>
+              <input id="ttsRate" type="range" min="0.5" max="2" step="0.1" value="1" />
+              <span id="ttsRateValue">1.0x</span>
+            </div>
+            <div class="tts-range-row">
+              <span>Pitch</span>
+              <input id="ttsPitch" type="range" min="0.5" max="2" step="0.1" value="1" />
+              <span id="ttsPitchValue">1.0</span>
+            </div>
+            <div class="tts-range-row">
+              <span>Volume</span>
+              <input id="ttsVolume" type="range" min="0" max="1" step="0.1" value="1" />
+              <span id="ttsVolumeValue">100%</span>
+            </div>
+
+            <div class="tts-actions">
+              <button id="ttsPauseResumeBtn" class="secondary" type="button" disabled>Pause</button>
+              <button id="ttsStopBtn" class="secondary" type="button" disabled>Stop</button>
+            </div>
+
+            <div class="mode-note">
+              <div id="ttsCurrentVoice">Voice: loading browser voices...</div>
+              <div id="ttsStatus" class="hint tts-status">Idle</div>
+              <div id="ttsError" class="error"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -306,6 +439,29 @@
     const debugLogEl = document.getElementById('debugLog');
     const debugLogToggleEl = document.getElementById('debugLogToggle');
     const debugLogToggleLabelEl = document.getElementById('debugLogToggleLabel');
+    const transcribeTabEl = document.getElementById('transcribeTab');
+    const ttsTabEl = document.getElementById('ttsTab');
+    const transcribePanelEl = document.getElementById('transcribePanel');
+    const ttsPanelEl = document.getElementById('ttsPanel');
+    const ttsTextEl = document.getElementById('ttsText');
+    const ttsThemeSelectEl = document.getElementById('ttsThemeSelect');
+    const ttsEngineSelectEl = document.getElementById('ttsEngineSelect');
+    const ttsVoiceSelectEl = document.getElementById('ttsVoiceSelect');
+    const ttsReloadVoicesBtn = document.getElementById('ttsReloadVoicesBtn');
+    const ttsReadAllBtn = document.getElementById('ttsReadAllBtn');
+    const ttsReadSelectionBtn = document.getElementById('ttsReadSelectionBtn');
+    const ttsUseTranscriptBtn = document.getElementById('ttsUseTranscriptBtn');
+    const ttsPauseResumeBtn = document.getElementById('ttsPauseResumeBtn');
+    const ttsStopBtn = document.getElementById('ttsStopBtn');
+    const ttsRateEl = document.getElementById('ttsRate');
+    const ttsPitchEl = document.getElementById('ttsPitch');
+    const ttsVolumeEl = document.getElementById('ttsVolume');
+    const ttsRateValueEl = document.getElementById('ttsRateValue');
+    const ttsPitchValueEl = document.getElementById('ttsPitchValue');
+    const ttsVolumeValueEl = document.getElementById('ttsVolumeValue');
+    const ttsCurrentVoiceEl = document.getElementById('ttsCurrentVoice');
+    const ttsStatusEl = document.getElementById('ttsStatus');
+    const ttsErrorEl = document.getElementById('ttsError');
 
     let audioObjectUrl = null;
     let segments = [];
@@ -319,6 +475,11 @@
     let streamHorizonTime = 0;
     let debugSession = null;
     let activeUpdateCount = 0;
+    let ttsVoices = [];
+    let ttsVoiceURI = '';
+    let ttsUtterance = null;
+    let ttsSpeaking = false;
+    let ttsPaused = false;
     const debugControlsAllowed = new URLSearchParams(window.location.search).get('debug') === '1';
 
     function isDebugEnabled() { return debugControlsAllowed && Boolean(debugLogToggleEl?.checked); }
@@ -342,6 +503,205 @@
       if (!debugLogEl) return;
       debugLogEl.innerHTML = '';
       debugLogEl.style.display = 'none';
+    }
+
+    function canUseSpeechSynthesis() {
+      return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    }
+    function setActiveTab(tab) {
+      const showTts = tab === 'tts';
+      transcribePanelEl.hidden = showTts;
+      ttsPanelEl.hidden = !showTts;
+      transcribeTabEl.classList.toggle('active', !showTts);
+      ttsTabEl.classList.toggle('active', showTts);
+      transcribeTabEl.setAttribute('aria-selected', String(!showTts));
+      ttsTabEl.setAttribute('aria-selected', String(showTts));
+    }
+    function applyTheme(theme) {
+      const nextTheme = theme === 'light' ? 'light' : 'dark';
+      document.body.classList.toggle('theme-light', nextTheme === 'light');
+      if (ttsThemeSelectEl) ttsThemeSelectEl.value = nextTheme;
+      try { localStorage.setItem('audioStudioTheme', nextTheme); } catch (_) {}
+    }
+    function loadSavedTheme() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('audioStudioTheme') || savedTheme; } catch (_) {}
+      applyTheme(savedTheme);
+    }
+    function getTextSelection(value, selectionStart, selectionEnd) {
+      const start = Math.max(0, Math.min(selectionStart, selectionEnd, value.length));
+      const end = Math.max(0, Math.min(Math.max(selectionStart, selectionEnd), value.length));
+      return value.substring(start, end).trim();
+    }
+    function scoreTtsVoice(voice) {
+      const name = voice.name.toLowerCase();
+      let score = 0;
+      if (/natural|neural|premium|enhanced|online/.test(name)) score += 50;
+      if (/google|microsoft|samantha|ava|alloy|aria|jenny|guy|zira/.test(name)) score += 20;
+      if (voice.lang.toLowerCase().startsWith('en')) score += 10;
+      return score;
+    }
+    function sortTtsVoices(voices) {
+      return [...voices].sort((a, b) => scoreTtsVoice(b) - scoreTtsVoice(a) || a.name.localeCompare(b.name));
+    }
+    function pickPreferredTtsVoice(voices, currentVoiceURI) {
+      if (voices.some(voice => voice.voiceURI === currentVoiceURI)) return currentVoiceURI;
+      const preferredVoice =
+        voices.find(voice => /natural|neural|premium|enhanced|online/i.test(voice.name)) ||
+        voices.find(voice => voice.lang.toLowerCase().startsWith('en')) ||
+        voices[0];
+      return preferredVoice?.voiceURI || '';
+    }
+    function setTtsStatus(message) {
+      if (ttsStatusEl) ttsStatusEl.textContent = message || 'Idle';
+    }
+    function setTtsError(message = '') {
+      if (ttsErrorEl) ttsErrorEl.textContent = message;
+    }
+    function getSelectedTtsVoice() {
+      return ttsVoices.find(voice => voice.voiceURI === ttsVoiceURI) || ttsVoices[0] || null;
+    }
+    function updateTtsCurrentVoice() {
+      const selectedVoice = getSelectedTtsVoice();
+      if (!ttsCurrentVoiceEl) return;
+      ttsCurrentVoiceEl.textContent = selectedVoice
+        ? `Voice: ${selectedVoice.name} (${selectedVoice.lang})`
+        : 'Voice: no browser voice selected';
+    }
+    function updateTtsControlState() {
+      const supported = canUseSpeechSynthesis();
+      const hasText = Boolean(ttsTextEl?.value.trim());
+      ttsReadAllBtn.disabled = !supported || !hasText;
+      ttsReadSelectionBtn.disabled = !supported || !hasText;
+      ttsPauseResumeBtn.disabled = !ttsSpeaking;
+      ttsStopBtn.disabled = !ttsSpeaking;
+      ttsPauseResumeBtn.textContent = ttsPaused ? 'Resume' : 'Pause';
+      ttsVoiceSelectEl.disabled = !supported || !ttsVoices.length;
+      ttsReloadVoicesBtn.disabled = !supported;
+    }
+    function renderTtsVoiceOptions() {
+      if (!ttsVoiceSelectEl) return;
+      ttsVoiceSelectEl.innerHTML = '';
+      if (!canUseSpeechSynthesis()) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Speech synthesis is not supported';
+        ttsVoiceSelectEl.appendChild(option);
+        setTtsStatus('Your browser does not support text to speech.');
+        updateTtsCurrentVoice();
+        updateTtsControlState();
+        return;
+      }
+      if (!ttsVoices.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No voices loaded yet';
+        ttsVoiceSelectEl.appendChild(option);
+        setTtsStatus('Browser voices are still loading. Try Reload if the list stays empty.');
+        updateTtsCurrentVoice();
+        updateTtsControlState();
+        return;
+      }
+      for (const voice of ttsVoices) {
+        const option = document.createElement('option');
+        option.value = voice.voiceURI;
+        option.textContent = `${scoreTtsVoice(voice) >= 50 ? 'Natural - ' : ''}${voice.name} - ${voice.lang}`;
+        ttsVoiceSelectEl.appendChild(option);
+      }
+      ttsVoiceSelectEl.value = ttsVoiceURI;
+      setTtsStatus('Ready');
+      updateTtsCurrentVoice();
+      updateTtsControlState();
+    }
+    function loadTtsVoices() {
+      if (!canUseSpeechSynthesis()) {
+        renderTtsVoiceOptions();
+        return;
+      }
+      ttsVoices = sortTtsVoices(window.speechSynthesis.getVoices());
+      ttsVoiceURI = pickPreferredTtsVoice(ttsVoices, ttsVoiceURI);
+      renderTtsVoiceOptions();
+    }
+    function setTtsSpeakingState(speaking, paused = false) {
+      ttsSpeaking = speaking;
+      ttsPaused = paused;
+      updateTtsControlState();
+    }
+    function updateTtsRangeLabels() {
+      ttsRateValueEl.textContent = `${Number(ttsRateEl.value).toFixed(1)}x`;
+      ttsPitchValueEl.textContent = Number(ttsPitchEl.value).toFixed(1);
+      ttsVolumeValueEl.textContent = `${Math.round(Number(ttsVolumeEl.value) * 100)}%`;
+    }
+    function stopTts() {
+      if (canUseSpeechSynthesis()) window.speechSynthesis.cancel();
+      ttsUtterance = null;
+      setTtsSpeakingState(false, false);
+      setTtsStatus('Stopped');
+    }
+    function speakTts(content) {
+      const cleanContent = String(content || '').trim();
+      if (!cleanContent) {
+        setTtsStatus('Add text first.');
+        return;
+      }
+      if (!canUseSpeechSynthesis()) {
+        setTtsError('This browser does not support the Web Speech API.');
+        updateTtsControlState();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      setTtsError('');
+      const utterance = new SpeechSynthesisUtterance(cleanContent);
+      const selectedVoice = getSelectedTtsVoice();
+      if (selectedVoice) utterance.voice = selectedVoice;
+      utterance.rate = Number(ttsRateEl.value) || 1;
+      utterance.pitch = Number(ttsPitchEl.value) || 1;
+      utterance.volume = Number(ttsVolumeEl.value) || 1;
+      utterance.onstart = () => {
+        setTtsStatus('Speaking with browser voice.');
+        setTtsSpeakingState(true, false);
+      };
+      utterance.onend = () => {
+        ttsUtterance = null;
+        setTtsStatus('Finished');
+        setTtsSpeakingState(false, false);
+      };
+      utterance.onerror = () => {
+        ttsUtterance = null;
+        setTtsError('Browser speech failed. Try another voice.');
+        setTtsSpeakingState(false, false);
+      };
+      ttsUtterance = utterance;
+      window.speechSynthesis.speak(utterance);
+      setTtsStatus('Starting speech...');
+      setTtsSpeakingState(true, false);
+    }
+    function readTtsSelection() {
+      const selectedText = getTextSelection(ttsTextEl.value, ttsTextEl.selectionStart, ttsTextEl.selectionEnd);
+      speakTts(selectedText || ttsTextEl.value);
+    }
+    function pauseResumeTts() {
+      if (!ttsSpeaking || !canUseSpeechSynthesis()) return;
+      if (ttsPaused) {
+        window.speechSynthesis.resume();
+        setTtsStatus('Speaking with browser voice.');
+        setTtsSpeakingState(true, false);
+        return;
+      }
+      window.speechSynthesis.pause();
+      setTtsStatus('Paused');
+      setTtsSpeakingState(true, true);
+    }
+    function useTranscriptForTts() {
+      const transcriptText = segments.map(seg => seg.text).join(' ').trim();
+      if (!transcriptText) {
+        setTtsStatus('Transcribe audio first, then use the transcript here.');
+        return;
+      }
+      ttsTextEl.value = transcriptText;
+      setActiveTab('tts');
+      setTtsStatus('Transcript loaded into text reader.');
+      updateTtsControlState();
     }
 
     function setStatus(message) { statusEl.textContent = message; }
@@ -1106,6 +1466,38 @@
       }
     });
 
+    transcribeTabEl.addEventListener('click', () => setActiveTab('transcribe'));
+    ttsTabEl.addEventListener('click', () => {
+      setActiveTab('tts');
+      loadTtsVoices();
+    });
+    ttsThemeSelectEl.addEventListener('change', () => applyTheme(ttsThemeSelectEl.value));
+    ttsTextEl.addEventListener('input', updateTtsControlState);
+    ttsVoiceSelectEl.addEventListener('change', () => {
+      ttsVoiceURI = ttsVoiceSelectEl.value;
+      updateTtsCurrentVoice();
+    });
+    ttsReloadVoicesBtn.addEventListener('click', loadTtsVoices);
+    ttsReadAllBtn.addEventListener('click', () => speakTts(ttsTextEl.value));
+    ttsReadSelectionBtn.addEventListener('click', readTtsSelection);
+    ttsUseTranscriptBtn.addEventListener('click', useTranscriptForTts);
+    ttsPauseResumeBtn.addEventListener('click', pauseResumeTts);
+    ttsStopBtn.addEventListener('click', stopTts);
+    [ttsRateEl, ttsPitchEl, ttsVolumeEl].forEach(input => input.addEventListener('input', updateTtsRangeLabels));
+    if (canUseSpeechSynthesis()) {
+      loadTtsVoices();
+      if (typeof window.speechSynthesis.addEventListener === 'function') {
+        window.speechSynthesis.addEventListener('voiceschanged', loadTtsVoices);
+      } else {
+        window.speechSynthesis.onvoiceschanged = loadTtsVoices;
+      }
+    } else {
+      renderTtsVoiceOptions();
+    }
+
+    loadSavedTheme();
+    updateTtsRangeLabels();
+    updateTtsControlState();
     updateTimestampHint();
     setDownloadReady(false);
     if (debugLogToggleEl) {
