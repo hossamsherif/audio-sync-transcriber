@@ -110,6 +110,21 @@
     .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .smallnote { font-size: 12px; color: var(--muted); }
     .timestamp-hint { margin-top: 6px; }
+    .debug-log {
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px solid #2a3a73;
+      border-radius: 10px;
+      background: rgba(2, 6, 22, 0.55);
+      color: var(--muted);
+      max-height: 170px;
+      overflow-y: auto;
+      font-size: 11px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      display: none;
+    }
+    .debug-log-entry { margin: 0; }
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
       .twocol { grid-template-columns: 1fr; }
@@ -161,11 +176,11 @@
           <div class="row twocol">
             <div>
               <label for="chunkLength">Chunk length (seconds)</label>
-              <input id="chunkLength" type="number" min="10" max="60" step="1" value="29" />
+              <input id="chunkLength" type="number" min="10" max="28" step="1" value="24" />
             </div>
             <div>
               <label for="strideLength">Stride (seconds)</label>
-              <input id="strideLength" type="number" min="1" max="10" step="1" value="5" />
+              <input id="strideLength" type="number" min="1" max="5" step="1" value="3" />
             </div>
           </div>
 
@@ -223,11 +238,16 @@
               <input id="autoscrollToggle" type="checkbox" checked />
               Auto-scroll
             </label>
+            <label id="debugLogToggleLabel" class="inline-check" hidden>
+              <input id="debugLogToggle" type="checkbox" />
+              Debug logging
+            </label>
           </div>
 
           <div id="transcript" class="transcript">
             <div class="empty">Transcribe an audio file to generate a synced transcript here.</div>
           </div>
+          <div id="debugLog" class="debug-log" aria-live="polite"></div>
         </div>
       </section>
     </div>
@@ -245,6 +265,12 @@
     }
 
     const TARGET_SAMPLE_RATE = 16000;
+    const MAX_ASR_WINDOW_SECONDS = 30;
+    const SAMPLE_PROCESS_BATCH_SIZE = 250000;
+    const DESKTOP_MAX_AUDIO_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+    const MOBILE_MAX_AUDIO_FILE_SIZE_BYTES = 40 * 1024 * 1024;
+    const DESKTOP_MAX_AUDIO_DURATION_SECONDS = 45 * 60;
+    const MOBILE_MAX_AUDIO_DURATION_SECONDS = 15 * 60;
     const ACTIVE_SEGMENT_HOLD_SECONDS = 0.08;
     const READABLE_SEGMENT_GAP_SEC = 0.42;
     const READABLE_SEGMENT_MAX_DURATION_SEC = 9;
@@ -277,6 +303,9 @@
     const searchBoxEl = document.getElementById('searchBox');
     const autoscrollToggleEl = document.getElementById('autoscrollToggle');
     const timestampHintEl = document.getElementById('timestampHint');
+    const debugLogEl = document.getElementById('debugLog');
+    const debugLogToggleEl = document.getElementById('debugLogToggle');
+    const debugLogToggleLabelEl = document.getElementById('debugLogToggleLabel');
 
     let audioObjectUrl = null;
     let segments = [];
@@ -288,6 +317,32 @@
     let jobNonce = 0;
     let streamActive = false;
     let streamHorizonTime = 0;
+    let debugSession = null;
+    let activeUpdateCount = 0;
+    const debugControlsAllowed = new URLSearchParams(window.location.search).get('debug') === '1';
+
+    function isDebugEnabled() { return debugControlsAllowed && Boolean(debugLogToggleEl?.checked); }
+    function toFixedOrZero(value) { return Number.isFinite(value) ? value.toFixed(1) : '0.0'; }
+    function appendDebugLog(message) {
+      if (!isDebugEnabled()) return;
+      const now = new Date().toISOString();
+      const line = `[${now}] ${message}`;
+      if (debugLogEl) {
+        const entry = document.createElement('div');
+        entry.className = 'debug-log-entry';
+        entry.textContent = line;
+        debugLogEl.appendChild(entry);
+        while (debugLogEl.children.length > 120) debugLogEl.removeChild(debugLogEl.firstChild);
+        debugLogEl.style.display = 'block';
+        debugLogEl.scrollTop = debugLogEl.scrollHeight;
+      }
+      console.debug(`[transcribe-debug] ${message}`);
+    }
+    function clearDebugLog() {
+      if (!debugLogEl) return;
+      debugLogEl.innerHTML = '';
+      debugLogEl.style.display = 'none';
+    }
 
     function setStatus(message) { statusEl.textContent = message; }
     function setError(message = '') { errorEl.textContent = message; }
@@ -335,8 +390,58 @@
     function updateClock(current, duration) {
       timeLabelEl.textContent = `${formatTime(current || 0)} / ${formatTime(duration || 0)}`;
     }
+    function isLikelyMobileDevice() {
+      if (navigator.userAgentData?.mobile) return true;
+      if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
+      return navigator.maxTouchPoints > 1 && Math.min(window.screen?.width || 0, window.screen?.height || 0) < 900;
+    }
+    function getAudioLimits() {
+      const mobile = isLikelyMobileDevice();
+      return {
+        mobile,
+        maxBytes: mobile ? MOBILE_MAX_AUDIO_FILE_SIZE_BYTES : DESKTOP_MAX_AUDIO_FILE_SIZE_BYTES,
+        maxDuration: mobile ? MOBILE_MAX_AUDIO_DURATION_SECONDS : DESKTOP_MAX_AUDIO_DURATION_SECONDS,
+      };
+    }
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes)) return '0 MB';
+      return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+    }
+    function validateAudioFileSize(file) {
+      const limits = getAudioLimits();
+      if (file.size > limits.maxBytes) {
+        throw new Error(`Audio file is ${formatBytes(file.size)}. Browser transcription is limited to ${formatBytes(limits.maxBytes)} ${limits.mobile ? 'on mobile' : 'in this browser'} for GitHub Pages.`);
+      }
+    }
+    function validateAudioDuration(duration) {
+      if (!Number.isFinite(duration)) return;
+      const limits = getAudioLimits();
+      if (duration > limits.maxDuration) {
+        throw new Error(`Audio is ${formatTime(duration)} long. Browser transcription is limited to ${formatTime(limits.maxDuration)} ${limits.mobile ? 'on mobile' : 'in this browser'} for GitHub Pages.`);
+      }
+    }
+    function clampNumber(value, min, max, fallback) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return fallback;
+      return Math.max(min, Math.min(max, numeric));
+    }
+    function normalizeChunkSettings(rawChunkLength, rawStrideLength) {
+      let chunkLength = clampNumber(rawChunkLength, 10, 28, 24);
+      let strideLength = clampNumber(rawStrideLength, 1, 5, 3);
+      const maxStride = Math.max(0, Math.floor((MAX_ASR_WINDOW_SECONDS - chunkLength) / 2));
+      let adjusted = false;
+      if (strideLength > maxStride) {
+        strideLength = Math.max(0, maxStride);
+        adjusted = true;
+      }
+      return { chunkLength, strideLength, adjusted };
+    }
+    function yieldToBrowser() {
+      return new Promise(resolve => setTimeout(resolve, 0));
+    }
     function pickDevice() {
       if (deviceSelectEl.value !== 'auto') return deviceSelectEl.value;
+      if (isLikelyMobileDevice()) return 'wasm';
       return navigator.gpu ? 'webgpu' : 'wasm';
     }
     function escapeHtml(value) {
@@ -352,41 +457,65 @@
       const safe = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return escapeHtml(text).replace(new RegExp(safe, 'ig'), m => `<mark>${m}</mark>`);
     }
-    function averageChannels(audioBuffer) {
-      if (audioBuffer.numberOfChannels === 1) return Float32Array.from(audioBuffer.getChannelData(0));
-      const length = audioBuffer.length;
-      const channels = Array.from({ length: audioBuffer.numberOfChannels }, (_, i) => audioBuffer.getChannelData(i));
-      const mixed = new Float32Array(length);
-      for (let i = 0; i < length; i++) {
-        let sum = 0;
-        for (const channel of channels) sum += channel[i];
-        mixed[i] = sum / channels.length;
-      }
-      return mixed;
-    }
-    function resampleLinear(samples, sourceRate, targetRate) {
-      if (sourceRate === targetRate) return Float32Array.from(samples);
-      const ratio = sourceRate / targetRate;
-      const newLength = Math.max(1, Math.round(samples.length / ratio));
-      const output = new Float32Array(newLength);
-      for (let i = 0; i < newLength; i++) {
-        const position = i * ratio;
-        const left = Math.floor(position);
-        const right = Math.min(left + 1, samples.length - 1);
-        const frac = position - left;
-        output[i] = samples[left] * (1 - frac) + samples[right] * frac;
+    async function copySamples(samples) {
+      const output = new Float32Array(samples.length);
+      for (let offset = 0; offset < samples.length; offset += SAMPLE_PROCESS_BATCH_SIZE) {
+        const end = Math.min(samples.length, offset + SAMPLE_PROCESS_BATCH_SIZE);
+        output.set(samples.subarray(offset, end), offset);
+        await yieldToBrowser();
       }
       return output;
     }
-    async function decodeAudioFile(file) {
+    async function averageChannels(audioBuffer) {
+      if (audioBuffer.numberOfChannels === 1) return copySamples(audioBuffer.getChannelData(0));
+      const length = audioBuffer.length;
+      const channels = Array.from({ length: audioBuffer.numberOfChannels }, (_, i) => audioBuffer.getChannelData(i));
+      const mixed = new Float32Array(length);
+      for (let offset = 0; offset < length; offset += SAMPLE_PROCESS_BATCH_SIZE) {
+        const end = Math.min(length, offset + SAMPLE_PROCESS_BATCH_SIZE);
+        for (let i = offset; i < end; i++) {
+          let sum = 0;
+          for (const channel of channels) sum += channel[i];
+          mixed[i] = sum / channels.length;
+        }
+        await yieldToBrowser();
+      }
+      return mixed;
+    }
+    async function resampleLinear(samples, sourceRate, targetRate) {
+      if (sourceRate === targetRate) return copySamples(samples);
+      const ratio = sourceRate / targetRate;
+      const newLength = Math.max(1, Math.round(samples.length / ratio));
+      const output = new Float32Array(newLength);
+      for (let offset = 0; offset < newLength; offset += SAMPLE_PROCESS_BATCH_SIZE) {
+        const end = Math.min(newLength, offset + SAMPLE_PROCESS_BATCH_SIZE);
+        for (let i = offset; i < end; i++) {
+          const position = i * ratio;
+          const left = Math.floor(position);
+          const right = Math.min(left + 1, samples.length - 1);
+          const frac = position - left;
+          output[i] = samples[left] * (1 - frac) + samples[right] * frac;
+        }
+        await yieldToBrowser();
+      }
+      return output;
+    }
+    async function decodeAudioFile(file, onStage = () => {}) {
+      validateAudioFileSize(file);
+      onStage('Reading audio file...');
       const arrayBuffer = await file.arrayBuffer();
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) throw new Error('This browser does not support the Web Audio API.');
       const context = new AudioContextClass();
       try {
-        const decoded = await context.decodeAudioData(arrayBuffer.slice(0));
-        const mono = averageChannels(decoded);
-        return resampleLinear(mono, decoded.sampleRate, TARGET_SAMPLE_RATE);
+        onStage('Decoding audio...');
+        await yieldToBrowser();
+        const decoded = await context.decodeAudioData(arrayBuffer);
+        validateAudioDuration(decoded.duration);
+        onStage('Mixing audio...');
+        const mono = await averageChannels(decoded);
+        onStage('Resampling audio...');
+        return await resampleLinear(mono, decoded.sampleRate, TARGET_SAMPLE_RATE);
       } finally {
         try { await context.close(); } catch (_) {}
       }
@@ -455,6 +584,24 @@
       }
       return [];
     }
+    function joinsWithoutLeadingSpace(text) {
+      return text.startsWith("'") || text.startsWith(',') || text.startsWith('.') || text.startsWith('!') || text.startsWith('?');
+    }
+    function getMergedSegmentText(leftText, rightText) {
+      const trimmedLeft = leftText.trim();
+      return `${trimmedLeft}${joinsWithoutLeadingSpace(rightText) ? '' : ' '}${rightText}`.trim();
+    }
+    function canMergeSegments(left, right, mergedText = getMergedSegmentText(left.text, right.text)) {
+      const gap = right.start - left.end;
+      const combinedDuration = right.end - left.start;
+      const sentenceBoundary = /[.!?…]$/.test(left.text.trim());
+      return (
+        gap <= READABLE_SEGMENT_GAP_SEC &&
+        !sentenceBoundary &&
+        combinedDuration <= READABLE_SEGMENT_MAX_DURATION_SEC &&
+        mergedText.length <= READABLE_SEGMENT_MAX_TEXT_LEN
+      );
+    }
     function mergeReadableSegments(rawSegments) {
       const normalized = normalizeSegments(rawSegments);
       if (!normalized.length) return [];
@@ -463,19 +610,9 @@
       for (let i = 1; i < normalized.length; i++) {
         const seg = normalized[i];
         const last = merged[merged.length - 1];
-        const gap = seg.start - last.end;
-        const combinedDuration = seg.end - last.start;
-        const trimmedLast = last.text.trim();
-        const sentenceBoundary = /[.!?…]$/.test(trimmedLast);
-        const mergedText = `${trimmedLast}${seg.text.startsWith("'") || seg.text.startsWith(',') || seg.text.startsWith('.') || seg.text.startsWith('!') || seg.text.startsWith('?') ? '' : ' '}${seg.text}`.trim();
+        const mergedText = getMergedSegmentText(last.text, seg.text);
 
-        const canMerge =
-          gap <= READABLE_SEGMENT_GAP_SEC &&
-          !sentenceBoundary &&
-          combinedDuration <= READABLE_SEGMENT_MAX_DURATION_SEC &&
-          mergedText.length <= READABLE_SEGMENT_MAX_TEXT_LEN;
-
-        if (canMerge) {
+        if (canMergeSegments(last, seg, mergedText)) {
           last.text = mergedText;
           last.end = seg.end;
           continue;
@@ -485,6 +622,30 @@
       }
 
       return merged;
+    }
+    function appendReadableSegments(nextSegments) {
+      const normalized = normalizeSegments(nextSegments);
+      if (!normalized.length) return { changed: false, changedFrom: segments.length };
+      let changedFrom = segments.length;
+
+      for (const seg of normalized) {
+        if (segments.length) {
+          const lastIndex = segments.length - 1;
+          const last = segments[lastIndex];
+          const mergedText = getMergedSegmentText(last.text, seg.text);
+          if (canMergeSegments(last, seg, mergedText)) {
+            last.text = mergedText;
+            last.end = seg.end;
+            changedFrom = Math.min(changedFrom, lastIndex);
+            continue;
+          }
+        }
+
+        changedFrom = Math.min(changedFrom, segments.length);
+        segments.push({ ...seg });
+      }
+
+      return { changed: true, changedFrom };
     }
     async function getTranscriber() {
       const model = modelSelectEl.value;
@@ -510,9 +671,42 @@
       currentKey = key;
       return transcriber;
     }
+    function updateSegmentNodeContent(node, seg, index, totalSegments, rawQuery) {
+      node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
+      if (index % 2 === 0 && index < totalSegments - 1) {
+        node.insertAdjacentText('beforeend', ' ');
+      }
+    }
+    function createSegmentNode(seg, index, totalSegments, rawQuery) {
+      const node = document.createElement('span');
+      node.className = 'segment';
+      updateSegmentNodeContent(node, seg, index, totalSegments, rawQuery);
+      node.addEventListener('click', () => {
+        audioEl.currentTime = seg.start;
+        audioEl.play().catch(() => {});
+        updateActiveSegment();
+      });
+      return node;
+    }
+    function getSegmentGroup(index) {
+      const groupIndex = Math.floor(index / 2);
+      let groupEl = transcriptEl.children[groupIndex];
+      if (!groupEl || !groupEl.classList.contains('segment-group')) {
+        groupEl = document.createElement('div');
+        groupEl.className = 'segment-group';
+        transcriptEl.appendChild(groupEl);
+      }
+      return groupEl;
+    }
     function renderTranscript() {
       const query = searchBoxEl.value.trim().toLowerCase();
       filteredSegments = query ? segments.filter(seg => seg.text.toLowerCase().includes(query)) : [...segments];
+      if (debugSession) {
+        debugSession.renderCount = (debugSession.renderCount || 0) + 1;
+        if (debugSession.renderCount <= 12 || debugSession.renderCount % 5 === 0) {
+          appendDebugLog(`renderTranscript #${debugSession.renderCount} (segments=${segments.length}, filtered=${filteredSegments.length})`);
+        }
+      }
       countLabelEl.textContent = `${filteredSegments.length} segment${filteredSegments.length === 1 ? '' : 's'}`;
       if (!filteredSegments.length) {
         transcriptEl.innerHTML = `<div class="empty">${segments.length ? 'No matching lines.' : 'Transcribe an audio file to generate a synced transcript here.'}</div>`;
@@ -529,20 +723,41 @@
           groupEl.className = 'segment-group';
           transcriptEl.appendChild(groupEl);
         }
-        const node = document.createElement('span');
-        node.className = 'segment';
-        node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
-        if (index % 2 === 0 && index < filteredSegments.length - 1) {
-          node.insertAdjacentText('beforeend', ' ');
-        }
-        node.addEventListener('click', () => {
-          audioEl.currentTime = seg.start;
-          audioEl.play().catch(() => {});
-          updateActiveSegment();
-        });
+        const node = createSegmentNode(seg, index, filteredSegments.length, rawQuery);
         groupEl?.appendChild(node);
         return node;
       });
+      updateActiveSegment();
+    }
+    function renderTranscriptIncremental(changedFrom = 0) {
+      const rawQuery = searchBoxEl.value.trim();
+      if (rawQuery) {
+        renderTranscript();
+        return;
+      }
+      filteredSegments = [...segments];
+      countLabelEl.textContent = `${filteredSegments.length} segment${filteredSegments.length === 1 ? '' : 's'}`;
+      if (!filteredSegments.length) {
+        renderTranscript();
+        return;
+      }
+      if (!segmentNodes.length || transcriptEl.querySelector('.empty')) {
+        transcriptEl.innerHTML = '';
+      }
+      const lastIndex = Math.max(0, filteredSegments.length - 1);
+      const startIndex = Math.max(0, Math.min(changedFrom > 0 ? changedFrom - 1 : 0, lastIndex));
+      for (let index = startIndex; index < filteredSegments.length; index++) {
+        const seg = filteredSegments[index];
+        let node = segmentNodes[index];
+        if (!node) {
+          node = createSegmentNode(seg, index, filteredSegments.length, rawQuery);
+          segmentNodes[index] = node;
+          getSegmentGroup(index).appendChild(node);
+        } else {
+          updateSegmentNodeContent(node, seg, index, filteredSegments.length, rawQuery);
+        }
+      }
+      segmentNodes.length = filteredSegments.length;
       updateActiveSegment();
     }
     function findActiveSegmentIndex(time) {
@@ -568,6 +783,10 @@
       return -1;
     }
     function updateActiveSegment() {
+      activeUpdateCount += 1;
+      if (debugSession && activeUpdateCount % 200 === 0) {
+        appendDebugLog(`updateActiveSegment count=${activeUpdateCount}`);
+      }
       if (!segmentNodes.length) return;
       const nextActive = findActiveSegmentIndex(audioEl.currentTime || 0);
       if (nextActive === activeIndex) {
@@ -595,18 +814,19 @@
       setDownloadReady(ready);
     }
     function appendTranscriptData(nextSegments, chunkIndex, totalChunks) {
-      if (nextSegments.length) {
-        segments.push(...nextSegments);
+      const beforeCount = segments.length;
+      if (debugSession) {
+        appendDebugLog(`append chunk ${chunkIndex}/${totalChunks}: incoming=${nextSegments.length}, before=${beforeCount}`);
       }
-      if (!segments.length) {
-        segments = [];
-        setTranscriptData(segments);
-      } else {
-        segments = mergeReadableSegments(segments);
+      const result = appendReadableSegments(nextSegments);
+      if (result.changed) {
+        renderTranscriptIncremental(result.changedFrom);
+      } else if (!segments.length) {
         renderTranscript();
       }
-      const ready = segments.length > 0;
-      setDownloadReady(ready);
+      if (debugSession) {
+        appendDebugLog(`append chunk ${chunkIndex}/${totalChunks}: after merge ${beforeCount} -> ${segments.length}`);
+      }
       if (chunkIndex != null && totalChunks != null) {
         setProgress(Math.round((chunkIndex / totalChunks) * 100), `Transcribing chunk ${chunkIndex} / ${totalChunks}`);
       }
@@ -654,7 +874,7 @@
           windowStart,
           windowStartSec: windowStart / TARGET_SAMPLE_RATE,
           windowEndSec: windowEnd / TARGET_SAMPLE_RATE,
-          chunkAudio: audioData => audioData.slice(windowStart, windowEnd),
+          chunkAudio: audioData => audioData.subarray(windowStart, windowEnd),
         });
       }
       return windows;
@@ -685,20 +905,45 @@
       const model = modelSelectEl.value;
       const device = pickDevice();
       const dtype = dtypeSelectEl.value;
-      const chunkLength = Math.max(10, Number(chunkLengthEl.value) || 29);
-      const strideLength = Math.max(1, Number(strideLengthEl.value) || 5);
+      const chunkSettings = normalizeChunkSettings(chunkLengthEl.value, strideLengthEl.value);
+      const { chunkLength, strideLength } = chunkSettings;
       const timestampMode = timestampModeEl.value;
+      const decodeStart = performance.now();
+      debugSession = {
+        job: localJob,
+        startedAt: performance.now(),
+        audioDecodeMs: 0,
+        modelLoadMs: 0,
+        renderCount: 0,
+      };
+      clearDebugLog();
+      if (isDebugEnabled()) {
+        appendDebugLog(`session ${localJob} start`);
+        appendDebugLog(`settings file=${file.name} model=${model} device=${device} dtype=${dtype} chunkLength=${chunkLength} stride=${strideLength} timestampMode=${timestampMode}`);
+      }
 
       setBusy(true);
       setError('');
       setSuccess('');
       setWarning('');
+      setDownloadReady(false);
+      activeUpdateCount = 0;
+      if (chunkSettings.adjusted) {
+        chunkLengthEl.value = String(chunkLength);
+        strideLengthEl.value = String(strideLength);
+        setWarning(`Chunk settings were adjusted to keep each browser ASR window under ${MAX_ASR_WINDOW_SECONDS}s.`);
+      }
       setStatus('Preparing audio...');
       setProgress(0, 'Decoding audio...');
       modelLabelEl.textContent = `Model: ${model.split('/').pop()} | ${device} | ${dtype}`;
 
       try {
-        const audioData = await decodeAudioFile(file);
+        validateAudioDuration(audioEl.duration);
+        const audioData = await decodeAudioFile(file, label => setProgress(0, label));
+        debugSession.audioDecodeMs = performance.now() - decodeStart;
+        if (isDebugEnabled()) {
+          appendDebugLog(`audio decoded in ${toFixedOrZero(debugSession.audioDecodeMs)} ms (${audioData.length} samples, ${(audioData.length / TARGET_SAMPLE_RATE).toFixed(2)}s)`);
+        }
         if (localJob !== jobNonce) return;
 
         if (dtype !== 'fp32') {
@@ -706,6 +951,10 @@
         }
 
         const asr = await getTranscriber();
+        debugSession.modelLoadMs = performance.now() - (debugSession.startedAt || decodeStart);
+        if (isDebugEnabled()) {
+          appendDebugLog(`model ready in ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
+        }
         if (localJob !== jobNonce) return;
 
         setStatus('Running transcription...');
@@ -719,6 +968,7 @@
         renderTranscript();
         for (let i = 0; i < totalChunks; i++) {
           if (localJob !== jobNonce) return;
+          const chunkStart = performance.now();
           const {
             centralStart,
             centralEnd,
@@ -727,13 +977,18 @@
             chunkAudio,
           } = chunkWindows[i];
           streamHorizonTime = Math.max(streamHorizonTime, centralEnd);
+          if (isDebugEnabled()) {
+            appendDebugLog(`chunk ${i + 1}/${totalChunks}: window [${centralStart.toFixed(2)}, ${centralEnd.toFixed(2)}], strideWindowStart=${windowStartSec.toFixed(2)}`);
+          }
           try {
             const windowData = chunkAudio(audioData);
+            const asrStart = performance.now();
             const output = await asr(windowData, {
-              chunk_length_s: chunkLength,
-              stride_length_s: strideLength,
               return_timestamps: timestampMode === 'word' ? 'word' : true,
             });
+            if (isDebugEnabled()) {
+              appendDebugLog(`chunk ${i + 1}/${totalChunks} ASR time ${toFixedOrZero(performance.now() - asrStart)} ms`);
+            }
             if (localJob !== jobNonce) return;
             const chunkSegments = alignChunkSegments(
               outputToSegments(output, timestampMode),
@@ -741,7 +996,13 @@
               centralStart,
               centralEnd,
             );
+            if (isDebugEnabled()) {
+              appendDebugLog(`chunk ${i + 1}/${totalChunks} aligned ${chunkSegments.length} segments`);
+            }
             appendTranscriptData(chunkSegments, i + 1, totalChunks);
+            if (isDebugEnabled()) {
+              appendDebugLog(`chunk ${i + 1}/${totalChunks} loop wall time ${toFixedOrZero(performance.now() - chunkStart)} ms`);
+            }
           } catch (err) {
             failedChunks += 1;
             console.error(err);
@@ -760,6 +1021,11 @@
         if (failedChunks) {
           setWarning(`${failedChunks} chunk${failedChunks === 1 ? '' : 's'} failed while transcribing.`);
         }
+        setDownloadReady(true);
+        if (isDebugEnabled() && debugSession) {
+          appendDebugLog(`session ${localJob} completed in ${toFixedOrZero(performance.now() - debugSession.startedAt)} ms`);
+          appendDebugLog(`render passes: ${debugSession.renderCount || 0}, decode ${toFixedOrZero(debugSession.audioDecodeMs)} ms, model ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
+        }
       } catch (error) {
         if (localJob !== jobNonce) return;
         console.error(error);
@@ -770,6 +1036,10 @@
         }
         setStatus('Transcription did not complete.');
         setIdleProgress('Failed');
+        setDownloadReady(false);
+        if (isDebugEnabled() && debugSession) {
+          appendDebugLog(`session ${localJob} failed after ${toFixedOrZero(performance.now() - debugSession.startedAt)} ms: ${message}`);
+        }
       } finally {
         streamActive = false;
         streamHorizonTime = 0;
@@ -779,6 +1049,8 @@
     function resetAll() {
       jobNonce += 1;
       setBusy(false);
+      debugSession = null;
+      clearDebugLog();
       setIdleProgress('Idle');
       setStatus('Reset.');
       setError('');
@@ -836,6 +1108,14 @@
 
     updateTimestampHint();
     setDownloadReady(false);
+    if (debugLogToggleEl) {
+      if (debugLogToggleLabelEl) debugLogToggleLabelEl.hidden = !debugControlsAllowed;
+      debugLogToggleEl.checked = debugControlsAllowed;
+      debugLogToggleEl.addEventListener('change', () => {
+        if (!debugLogEl) return;
+        debugLogEl.style.display = debugLogToggleEl.checked ? 'block' : 'none';
+      });
+    }
     updateClock(0, 0);
     setIdleProgress('Idle');
   </script>
