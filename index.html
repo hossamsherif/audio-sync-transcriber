@@ -4,6 +4,39 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browser Whisper Sync Player</title>
+  <script>
+    // Register the service worker that (1) makes the page cross-origin isolated
+    // so multi-threaded WASM works on GitHub Pages, and (2) caches the app shell
+    // for offline use. Paths are relative so this works on the project subpath.
+    (function registerServiceWorker() {
+      if (!('serviceWorker' in navigator)) return;
+      // Reload exactly once when the SW first takes control, so the navigation is
+      // re-served with the COOP/COEP headers that make the page cross-origin
+      // isolated. Guarded so a browser that won't isolate (or file://, where the
+      // SW can't register at all) never loops.
+      let reloadedForIsolation = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloadedForIsolation || window.crossOriginIsolated) return;
+        reloadedForIsolation = true;
+        window.location.reload();
+      });
+      navigator.serviceWorker.register('./sw.js').then((registration) => {
+        // Returning visit: SW already active but not yet controlling this page.
+        if (!window.crossOriginIsolated && registration.active && !navigator.serviceWorker.controller) {
+          reloadedForIsolation = true;
+          window.location.reload();
+        }
+      }).catch((err) => {
+        // Surface failures instead of hiding them (e.g. file:// or blocked SW).
+        console.warn('Service worker registration failed:', err);
+      });
+      // Ask the browser to keep cached model weights from being evicted, so the
+      // offline guarantee holds.
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(() => {});
+      }
+    })();
+  </script>
   <style>
     :root {
       --bg: #0b1020;
@@ -552,8 +585,11 @@
     env.useBrowserCache = true;
     env.allowLocalModels = false;
     if (env.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.numThreads = 1;
       env.backends.onnx.wasm.simd = true;
+      // Thread count is refined by configureOnnxThreads() once the device is
+      // known — multi-threaded WASM needs cross-origin isolation (sw.js), but a
+      // large pool hurts the WebGPU path (see that function).
+      env.backends.onnx.wasm.numThreads = 1;
     }
 
     const TARGET_SAMPLE_RATE = 16000;
@@ -1196,6 +1232,26 @@
       if (isLikelyMobileDevice()) return 'wasm';
       return navigator.gpu ? 'webgpu' : 'wasm';
     }
+    // Choose the WASM thread count for the device this run will use. Must run
+    // before the pipeline/ONNX backend is first created (the pool size is read
+    // at backend init), so call it at startup and before getTranscriber().
+    function configureOnnxThreads() {
+      const wasm = env.backends?.onnx?.wasm;
+      if (!wasm) return;
+      if (!self.crossOriginIsolated) { wasm.numThreads = 1; return; }
+      const cores = navigator.hardwareConcurrency || 4;
+      // WebGPU runs most ops on the GPU; only a few shape/control ops fall back
+      // to WASM. Whisper decodes autoregressively (many tiny CPU ops per token),
+      // so any thread pool just adds per-op SharedArrayBuffer barrier-sync
+      // overhead — and on Apple Silicon those barriers stall fast P-cores waiting
+      // on E-cores. So keep WebGPU single-threaded (matches the previously fast
+      // baseline). For pure WASM, use a capped pool: a real speedup without
+      // oversubscribing logical cores vs the main thread. Applies on the first
+      // run; changing device later may need a reload to fully resize the pool.
+      wasm.numThreads = pickDevice() === 'webgpu'
+        ? 1
+        : Math.max(1, Math.min(cores - 1, 8));
+    }
     function escapeHtml(value) {
       return value
         .replaceAll('&', '&amp;')
@@ -1709,6 +1765,7 @@
           setWarning('Quantized weights can still fail in some browsers. If session creation fails, switch back to fp32.');
         }
 
+        configureOnnxThreads();
         const asr = await getTranscriber();
         debugSession.modelLoadMs = performance.now() - (debugSession.startedAt || decodeStart);
         if (isDebugEnabled()) {
@@ -1920,6 +1977,7 @@
       closeTtsVoiceMenu(true);
     });
 
+    configureOnnxThreads();
     loadSavedTheme();
     renderTtsReadingView(ttsTextEl.value);
     updateTtsRangeLabels();
