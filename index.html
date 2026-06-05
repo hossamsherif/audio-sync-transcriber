@@ -1229,13 +1229,14 @@
       const cores = navigator.hardwareConcurrency || 4;
       // WebGPU runs most ops on the GPU; only a few shape/control ops fall back
       // to WASM. Whisper decodes autoregressively (many tiny CPU ops per token),
-      // so a big thread pool just adds per-op SharedArrayBuffer sync overhead and
-      // is slower than single-threaded. Use a tiny pool for GPU, and a capped
-      // pool for pure WASM (avoid oversubscribing logical cores vs the main
-      // thread). This applies on the first run; changing device later may need a
-      // reload to fully resize the pool.
+      // so any thread pool just adds per-op SharedArrayBuffer barrier-sync
+      // overhead — and on Apple Silicon those barriers stall fast P-cores waiting
+      // on E-cores. So keep WebGPU single-threaded (matches the previously fast
+      // baseline). For pure WASM, use a capped pool: a real speedup without
+      // oversubscribing logical cores vs the main thread. Applies on the first
+      // run; changing device later may need a reload to fully resize the pool.
       wasm.numThreads = pickDevice() === 'webgpu'
-        ? Math.min(2, cores)
+        ? 1
         : Math.max(1, Math.min(cores - 1, 8));
     }
     function escapeHtml(value) {
