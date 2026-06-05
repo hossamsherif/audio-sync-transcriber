@@ -4,6 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browser Whisper Sync Player</title>
+  <script>
+    // Register the service worker that (1) makes the page cross-origin isolated
+    // so multi-threaded WASM works on GitHub Pages, and (2) caches the app shell
+    // for offline use. Paths are relative so this works on the project subpath.
+    (function registerServiceWorker() {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.register('./sw.js').then((registration) => {
+        // First load: the SW is installed but the current page wasn't served
+        // through it, so it isn't isolated yet. Reload once to gain isolation.
+        if (!window.crossOriginIsolated && navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
+      }).catch(() => {});
+      // Ask the browser to keep cached model weights from being evicted, so the
+      // offline guarantee holds.
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(() => {});
+      }
+    })();
+  </script>
   <style>
     :root {
       --bg: #0b1020;
@@ -552,7 +572,11 @@
     env.useBrowserCache = true;
     env.allowLocalModels = false;
     if (env.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.numThreads = 1;
+      // Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin
+      // isolation. The service worker (sw.js) injects the COOP/COEP headers that
+      // GitHub Pages can't, so threads are available once isolated; otherwise
+      // fall back to single-threaded.
+      env.backends.onnx.wasm.numThreads = self.crossOriginIsolated ? (navigator.hardwareConcurrency || 4) : 1;
       env.backends.onnx.wasm.simd = true;
     }
 
