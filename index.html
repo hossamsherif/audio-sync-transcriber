@@ -572,12 +572,11 @@
     env.useBrowserCache = true;
     env.allowLocalModels = false;
     if (env.backends?.onnx?.wasm) {
-      // Multi-threaded WASM needs SharedArrayBuffer, which needs cross-origin
-      // isolation. The service worker (sw.js) injects the COOP/COEP headers that
-      // GitHub Pages can't, so threads are available once isolated; otherwise
-      // fall back to single-threaded.
-      env.backends.onnx.wasm.numThreads = self.crossOriginIsolated ? (navigator.hardwareConcurrency || 4) : 1;
       env.backends.onnx.wasm.simd = true;
+      // Thread count is refined by configureOnnxThreads() once the device is
+      // known — multi-threaded WASM needs cross-origin isolation (sw.js), but a
+      // large pool hurts the WebGPU path (see that function).
+      env.backends.onnx.wasm.numThreads = 1;
     }
 
     const TARGET_SAMPLE_RATE = 16000;
@@ -1220,6 +1219,25 @@
       if (isLikelyMobileDevice()) return 'wasm';
       return navigator.gpu ? 'webgpu' : 'wasm';
     }
+    // Choose the WASM thread count for the device this run will use. Must run
+    // before the pipeline/ONNX backend is first created (the pool size is read
+    // at backend init), so call it at startup and before getTranscriber().
+    function configureOnnxThreads() {
+      const wasm = env.backends?.onnx?.wasm;
+      if (!wasm) return;
+      if (!self.crossOriginIsolated) { wasm.numThreads = 1; return; }
+      const cores = navigator.hardwareConcurrency || 4;
+      // WebGPU runs most ops on the GPU; only a few shape/control ops fall back
+      // to WASM. Whisper decodes autoregressively (many tiny CPU ops per token),
+      // so a big thread pool just adds per-op SharedArrayBuffer sync overhead and
+      // is slower than single-threaded. Use a tiny pool for GPU, and a capped
+      // pool for pure WASM (avoid oversubscribing logical cores vs the main
+      // thread). This applies on the first run; changing device later may need a
+      // reload to fully resize the pool.
+      wasm.numThreads = pickDevice() === 'webgpu'
+        ? Math.min(2, cores)
+        : Math.max(1, Math.min(cores - 1, 8));
+    }
     function escapeHtml(value) {
       return value
         .replaceAll('&', '&amp;')
@@ -1733,6 +1751,7 @@
           setWarning('Quantized weights can still fail in some browsers. If session creation fails, switch back to fp32.');
         }
 
+        configureOnnxThreads();
         const asr = await getTranscriber();
         debugSession.modelLoadMs = performance.now() - (debugSession.startedAt || decodeStart);
         if (isDebugEnabled()) {
@@ -1944,6 +1963,7 @@
       closeTtsVoiceMenu(true);
     });
 
+    configureOnnxThreads();
     loadSavedTheme();
     renderTtsReadingView(ttsTextEl.value);
     updateTtsRangeLabels();
