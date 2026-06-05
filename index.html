@@ -10,13 +10,26 @@
     // for offline use. Paths are relative so this works on the project subpath.
     (function registerServiceWorker() {
       if (!('serviceWorker' in navigator)) return;
+      // Reload exactly once when the SW first takes control, so the navigation is
+      // re-served with the COOP/COEP headers that make the page cross-origin
+      // isolated. Guarded so a browser that won't isolate (or file://, where the
+      // SW can't register at all) never loops.
+      let reloadedForIsolation = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloadedForIsolation || window.crossOriginIsolated) return;
+        reloadedForIsolation = true;
+        window.location.reload();
+      });
       navigator.serviceWorker.register('./sw.js').then((registration) => {
-        // First load: the SW is installed but the current page wasn't served
-        // through it, so it isn't isolated yet. Reload once to gain isolation.
-        if (!window.crossOriginIsolated && navigator.serviceWorker.controller) {
+        // Returning visit: SW already active but not yet controlling this page.
+        if (!window.crossOriginIsolated && registration.active && !navigator.serviceWorker.controller) {
+          reloadedForIsolation = true;
           window.location.reload();
         }
-      }).catch(() => {});
+      }).catch((err) => {
+        // Surface failures instead of hiding them (e.g. file:// or blocked SW).
+        console.warn('Service worker registration failed:', err);
+      });
       // Ask the browser to keep cached model weights from being evicted, so the
       // offline guarantee holds.
       if (navigator.storage && navigator.storage.persist) {
