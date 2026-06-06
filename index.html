@@ -519,9 +519,20 @@
             <div>
               <label for="ttsEngineSelect">Speech engine</label>
               <select id="ttsEngineSelect">
-                <option value="browser">Browser voices</option>
+                <option value="local">Local neural — Kokoro (private)</option>
+                <option value="browser">Browser voices (may use cloud)</option>
               </select>
-              <div class="hint">Provider audio and local Piper models need extra runtime or backend setup, so this GitHub Pages version uses browser voices by default.</div>
+              <div class="hint">Local neural runs a Kokoro voice fully in your browser — nothing is sent to a server. Browser voices use the Web Speech API, whose higher-quality voices may be synthesized in the cloud. The Kokoro model downloads once on first use, then is cached.</div>
+            </div>
+
+            <div id="ttsDeviceRow">
+              <label for="ttsDeviceSelect">Compute</label>
+              <select id="ttsDeviceSelect">
+                <option value="auto">Auto (GPU if available)</option>
+                <option value="webgpu">WebGPU (fastest)</option>
+                <option value="wasm">CPU / WASM (most compatible)</option>
+              </select>
+              <div class="hint">Local neural only. Auto uses your GPU via WebGPU when present. If audio comes out as noise or static — a known issue on some newer GPUs — switch to CPU / WASM for correct (slower) output.</div>
             </div>
 
             <div>
@@ -642,6 +653,8 @@
     const ttsTextEl = document.getElementById('ttsText');
     const ttsReadingViewEl = document.getElementById('ttsReadingView');
     const ttsEngineSelectEl = document.getElementById('ttsEngineSelect');
+    const ttsDeviceRowEl = document.getElementById('ttsDeviceRow');
+    const ttsDeviceSelectEl = document.getElementById('ttsDeviceSelect');
     const ttsVoiceTriggerBtn = document.getElementById('ttsVoiceTriggerBtn');
     const ttsVoiceTriggerTextEl = document.getElementById('ttsVoiceTriggerText');
     const ttsVoiceMenuEl = document.getElementById('ttsVoiceMenu');
@@ -686,6 +699,31 @@
     let ttsActiveWordIndex = -1;
     let ttsHighlightTimer = null;
     let ttsBoundaryFallbackTimer = null;
+    // Local neural (Kokoro) TTS state.
+    let ttsEngine = ttsEngineSelectEl.value || 'local';
+    let ttsWorker = null;
+    let ttsAudioCtx = null;
+    let ttsSource = null;
+    let ttsGain = null;
+    let ttsSpeakId = 0;
+    let ttsLocalStartCtxTime = 0;
+    let ttsLocalDurationMs = 0;
+    const KOKORO_MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+    // Curated subset of Kokoro voices, shaped to reuse the existing voice picker.
+    const KOKORO_VOICES = [
+      { voiceURI: 'af_heart', name: 'Heart — American female', lang: 'en-US' },
+      { voiceURI: 'af_bella', name: 'Bella — American female', lang: 'en-US' },
+      { voiceURI: 'af_nicole', name: 'Nicole — American female', lang: 'en-US' },
+      { voiceURI: 'af_sarah', name: 'Sarah — American female', lang: 'en-US' },
+      { voiceURI: 'af_sky', name: 'Sky — American female', lang: 'en-US' },
+      { voiceURI: 'am_michael', name: 'Michael — American male', lang: 'en-US' },
+      { voiceURI: 'am_adam', name: 'Adam — American male', lang: 'en-US' },
+      { voiceURI: 'am_puck', name: 'Puck — American male', lang: 'en-US' },
+      { voiceURI: 'bf_emma', name: 'Emma — British female', lang: 'en-GB' },
+      { voiceURI: 'bf_isabella', name: 'Isabella — British female', lang: 'en-GB' },
+      { voiceURI: 'bm_george', name: 'George — British male', lang: 'en-GB' },
+      { voiceURI: 'bm_lewis', name: 'Lewis — British male', lang: 'en-GB' },
+    ];
     const debugControlsAllowed = new URLSearchParams(window.location.search).get('debug') === '1';
 
     function isDebugEnabled() { return debugControlsAllowed && Boolean(debugLogToggleEl?.checked); }
@@ -713,6 +751,24 @@
 
     function canUseSpeechSynthesis() {
       return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    }
+    // Local neural always works; only the browser engine depends on Web Speech.
+    function isTtsEngineReady() {
+      return ttsEngine === 'local' ? true : canUseSpeechSynthesis();
+    }
+    function pickTtsDevice() {
+      const choice = ttsDeviceSelectEl?.value || 'auto';
+      if (choice === 'webgpu' || choice === 'wasm') return choice;
+      return navigator.gpu ? 'webgpu' : 'wasm';
+    }
+    function pickTtsDtype(device) {
+      return device === 'webgpu' ? 'fp32' : 'q8';
+    }
+    function getTtsWorker() {
+      if (!ttsWorker) {
+        ttsWorker = new Worker('./tts-worker.js', { type: 'module' });
+      }
+      return ttsWorker;
     }
     function setActiveTab(tab) {
       const showTts = tab === 'tts';
@@ -931,7 +987,7 @@
       }
     }
     function updateTtsControlState() {
-      const supported = canUseSpeechSynthesis();
+      const supported = isTtsEngineReady();
       const hasText = Boolean(ttsTextEl?.value.trim());
       ttsReadAllBtn.disabled = !supported || !hasText;
       ttsReadSelectionBtn.disabled = !supported || !hasText;
@@ -940,12 +996,15 @@
       ttsPauseResumeBtn.textContent = ttsPaused ? 'Resume' : 'Pause';
       ttsVoiceTriggerBtn.disabled = !supported || !ttsVoices.length;
       ttsReloadVoicesBtn.disabled = !supported;
+      // Compute backend is local-engine-only; hide it for browser voices.
+      if (ttsDeviceRowEl) ttsDeviceRowEl.hidden = ttsEngine !== 'local';
+      if (ttsDeviceSelectEl) ttsDeviceSelectEl.disabled = ttsSpeaking;
       if ((!supported || !ttsVoices.length) && ttsVoiceMenuEl && !ttsVoiceMenuEl.hidden) closeTtsVoiceMenu(true);
     }
     function renderTtsVoiceOptions() {
       if (!ttsVoiceOptionsEl) return;
       ttsVoiceOptionsEl.innerHTML = '';
-      if (!canUseSpeechSynthesis()) {
+      if (!isTtsEngineReady()) {
         ttsVoiceOptionsEl.innerHTML = '<div class="tts-voice-empty">Speech synthesis is not supported</div>';
         setTtsStatus('Your browser does not support text to speech.');
         updateTtsCurrentVoice();
@@ -1006,6 +1065,12 @@
       updateTtsControlState();
     }
     function loadTtsVoices() {
+      if (ttsEngine === 'local') {
+        ttsVoices = KOKORO_VOICES.slice();
+        ttsVoiceURI = pickPreferredTtsVoice(ttsVoices, ttsVoiceURI) || (ttsVoices[0]?.voiceURI || '');
+        renderTtsVoiceOptions();
+        return;
+      }
       if (!canUseSpeechSynthesis()) {
         renderTtsVoiceOptions();
         return;
@@ -1024,12 +1089,147 @@
       ttsPitchValueEl.textContent = Number(ttsPitchEl.value).toFixed(1);
       ttsVolumeValueEl.textContent = `${Math.round(Number(ttsVolumeEl.value) * 100)}%`;
     }
+    function stopLocalPlaybackOnly() {
+      if (ttsSource) {
+        try { ttsSource.onended = null; ttsSource.stop(); } catch (_) {}
+        try { ttsSource.disconnect(); } catch (_) {}
+        ttsSource = null;
+      }
+      if (ttsAudioCtx && ttsAudioCtx.state === 'suspended') {
+        ttsAudioCtx.resume().catch(() => {});
+      }
+    }
     function stopTts() {
-      if (canUseSpeechSynthesis()) window.speechSynthesis.cancel();
-      ttsUtterance = null;
+      if (ttsEngine === 'local') {
+        ttsSpeakId += 1; // invalidate any in-flight generation/playback
+        if (ttsWorker) ttsWorker.postMessage({ type: 'cancel' });
+        stopLocalPlaybackOnly();
+      } else {
+        if (canUseSpeechSynthesis()) window.speechSynthesis.cancel();
+        ttsUtterance = null;
+      }
       resetTtsReadingHighlight();
       setTtsSpeakingState(false, false);
       setTtsStatus('Stopped');
+    }
+    // Mirror the Kokoro model download into the TTS status line.
+    function applyTtsModelProgress(info) {
+      if (info?.status === 'progress' && Number.isFinite(info.progress)) {
+        setTtsStatus(`Downloading voice model — ${Math.round(info.progress)}%`);
+      } else if (info?.status === 'done') {
+        setTtsStatus('Voice model ready. Generating…');
+      }
+    }
+    function getLocalElapsedMs() {
+      if (!ttsAudioCtx) return 0;
+      // AudioContext.currentTime freezes while suspended, so this is pause-safe.
+      return Math.max(0, (ttsAudioCtx.currentTime - ttsLocalStartCtxTime) * 1000);
+    }
+    // Drive word highlighting from real playback position against the known
+    // audio duration — more accurate than the WPM estimate the browser path
+    // falls back to, and naturally pause-correct.
+    function startLocalTtsHighlight(durationMs) {
+      clearTtsHighlightTimers();
+      if (!ttsWordSpans.length) return;
+      const totalWords = ttsWordSpans.length;
+      highlightTtsWord(0);
+      ttsHighlightTimer = setInterval(() => {
+        if (!ttsSpeaking || ttsPaused) return;
+        const elapsed = getLocalElapsedMs() + getTtsHighlightLeadMs();
+        const progress = Math.max(0, Math.min(1, elapsed / durationMs));
+        highlightTtsWord(Math.min(totalWords - 1, Math.floor(progress * totalWords)));
+        if (progress >= 1) clearTtsHighlightTimers();
+      }, 80);
+    }
+    function playLocalPcm(pcm, sampleRate, speakId) {
+      const ctx = ttsAudioCtx || (ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const buffer = ctx.createBuffer(1, pcm.length, sampleRate);
+      buffer.copyToChannel(pcm, 0);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.value = Number(ttsVolumeEl.value) || 1;
+      // Pitch is a secondary control; detune resamples (slightly couples tempo).
+      source.detune.value = (Number(ttsPitchEl.value) - 1) * 600;
+      source.connect(gain).connect(ctx.destination);
+      ttsSource = source;
+      ttsGain = gain;
+      const rateFactor = Math.pow(2, source.detune.value / 1200);
+      ttsLocalDurationMs = (buffer.duration / rateFactor) * 1000;
+      source.onended = () => {
+        if (ttsSpeakId !== speakId || ttsSource !== source) return;
+        ttsSource = null;
+        finishTtsReadingHighlight();
+        setTtsStatus('Finished');
+        setTtsSpeakingState(false, false);
+      };
+      ttsLocalStartCtxTime = ctx.currentTime;
+      source.start();
+      setTtsStatus('Speaking with local voice.');
+      setTtsSpeakingState(true, false);
+      startLocalTtsHighlight(ttsLocalDurationMs);
+    }
+    function speakLocalTts(content) {
+      const cleanContent = String(content || '').trim();
+      if (!cleanContent) {
+        setTtsStatus('Add text first.');
+        return;
+      }
+      const voice = getSelectedTtsVoice();
+      if (!voice) {
+        setTtsError('No local voice selected.');
+        return;
+      }
+      ttsSpeakId += 1;
+      const speakId = ttsSpeakId;
+      stopLocalPlaybackOnly();
+      // Create/resume the AudioContext inside the click gesture so autoplay
+      // policies don't block playback after the async generation round-trip.
+      const ctx = ttsAudioCtx || (ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      setTtsError('');
+      renderTtsReadingView(cleanContent);
+      setTtsStatus('Generating speech with local voice…');
+      setTtsSpeakingState(true, false);
+      const worker = getTtsWorker();
+      const onMessage = (event) => {
+        const msg = event.data;
+        if (!msg || msg.id !== speakId) return;
+        switch (msg.type) {
+          case 'tts-progress': applyTtsModelProgress(msg.info); break;
+          case 'tts-audio':
+            cleanup();
+            if (ttsSpeakId === speakId) playLocalPcm(msg.pcm, msg.sampleRate, speakId);
+            break;
+          case 'tts-error':
+            cleanup();
+            if (ttsSpeakId !== speakId) break;
+            setTtsError(`Local speech failed: ${msg.message}`);
+            setTtsStatus('Failed');
+            setTtsSpeakingState(false, false);
+            break;
+          case 'tts-cancelled': cleanup(); break;
+        }
+      };
+      function cleanup() { worker.removeEventListener('message', onMessage); }
+      worker.addEventListener('message', onMessage);
+      const ttsDevice = pickTtsDevice();
+      worker.postMessage({
+        type: 'generate',
+        id: speakId,
+        text: cleanContent,
+        voice: voice.voiceURI,
+        speed: getTtsRate(),
+        model: KOKORO_MODEL,
+        device: ttsDevice,
+        dtype: pickTtsDtype(ttsDevice),
+      });
+    }
+    // Engine-aware entry point used by the Read buttons.
+    function startTtsSpeak(content) {
+      if (ttsEngine === 'local') speakLocalTts(content);
+      else speakTts(content);
     }
     function speakTts(content) {
       const cleanContent = String(content || '').trim();
@@ -1096,10 +1296,24 @@
     }
     function readTtsSelection() {
       const selectedText = getTextSelection(ttsTextEl.value, ttsTextEl.selectionStart, ttsTextEl.selectionEnd);
-      speakTts(selectedText || ttsTextEl.value);
+      startTtsSpeak(selectedText || ttsTextEl.value);
     }
     function pauseResumeTts() {
-      if (!ttsSpeaking || !canUseSpeechSynthesis()) return;
+      if (!ttsSpeaking) return;
+      if (ttsEngine === 'local') {
+        if (!ttsAudioCtx || !ttsSource) return; // nothing to pause yet (still generating)
+        if (ttsPaused) {
+          ttsAudioCtx.resume();
+          setTtsStatus('Speaking with local voice.');
+          setTtsSpeakingState(true, false);
+        } else {
+          ttsAudioCtx.suspend();
+          setTtsStatus('Paused');
+          setTtsSpeakingState(true, true);
+        }
+        return;
+      }
+      if (!canUseSpeechSynthesis()) return;
       if (ttsPaused) {
         window.speechSynthesis.resume();
         setTtsStatus('Speaking with browser voice.');
@@ -1861,21 +2075,30 @@
       }
     });
     ttsReloadVoicesBtn.addEventListener('click', loadTtsVoices);
-    ttsReadAllBtn.addEventListener('click', () => speakTts(ttsTextEl.value));
+    ttsReadAllBtn.addEventListener('click', () => startTtsSpeak(ttsTextEl.value));
     ttsReadSelectionBtn.addEventListener('click', readTtsSelection);
     ttsUseTranscriptBtn.addEventListener('click', useTranscriptForTts);
     ttsPauseResumeBtn.addEventListener('click', pauseResumeTts);
     ttsStopBtn.addEventListener('click', stopTts);
-    [ttsRateEl, ttsPitchEl, ttsVolumeEl].forEach(input => input.addEventListener('input', updateTtsRangeLabels));
-    if (canUseSpeechSynthesis()) {
+    ttsEngineSelectEl.addEventListener('change', () => {
+      stopTts(); // stop whatever the previous engine was doing
+      ttsEngine = ttsEngineSelectEl.value;
       loadTtsVoices();
+      updateTtsControlState();
+      setTtsStatus('Ready');
+    });
+    [ttsRateEl, ttsPitchEl, ttsVolumeEl].forEach(input => input.addEventListener('input', updateTtsRangeLabels));
+    // Local engine: live-update playback volume without regenerating.
+    ttsVolumeEl.addEventListener('input', () => {
+      if (ttsEngine === 'local' && ttsGain) ttsGain.gain.value = Number(ttsVolumeEl.value) || 1;
+    });
+    loadTtsVoices(); // engine-aware (local works without Web Speech)
+    if (canUseSpeechSynthesis()) {
       if (typeof window.speechSynthesis.addEventListener === 'function') {
         window.speechSynthesis.addEventListener('voiceschanged', loadTtsVoices);
       } else {
         window.speechSynthesis.onvoiceschanged = loadTtsVoices;
       }
-    } else {
-      renderTtsVoiceOptions();
     }
     document.addEventListener('click', (event) => {
       if (ttsVoiceMenuEl.hidden) return;
