@@ -579,18 +579,10 @@
   </div>
 
   <script type="module">
-    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
-
-    env.allowRemoteModels = true;
-    env.useBrowserCache = true;
-    env.allowLocalModels = false;
-    if (env.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.simd = true;
-      // Thread count is refined by configureOnnxThreads() once the device is
-      // known — multi-threaded WASM needs cross-origin isolation (sw.js), but a
-      // large pool hurts the WebGPU path (see that function).
-      env.backends.onnx.wasm.numThreads = 1;
-    }
+    // Whisper transcription runs in asr-worker.js (off the main thread). The
+    // transformers.js pipeline + env config (including device-aware WASM thread
+    // count) live there now; this module only decodes audio, orchestrates the
+    // worker, and renders results.
 
     const TARGET_SAMPLE_RATE = 16000;
     const MAX_ASR_WINDOW_SECONDS = 30;
@@ -677,8 +669,7 @@
     let filteredSegments = [];
     let segmentNodes = [];
     let activeIndex = -1;
-    let transcriber = null;
-    let currentKey = null;
+    let asrWorker = null;
     let jobNonce = 0;
     let streamActive = false;
     let streamHorizonTime = 0;
@@ -1232,26 +1223,8 @@
       if (isLikelyMobileDevice()) return 'wasm';
       return navigator.gpu ? 'webgpu' : 'wasm';
     }
-    // Choose the WASM thread count for the device this run will use. Must run
-    // before the pipeline/ONNX backend is first created (the pool size is read
-    // at backend init), so call it at startup and before getTranscriber().
-    function configureOnnxThreads() {
-      const wasm = env.backends?.onnx?.wasm;
-      if (!wasm) return;
-      if (!self.crossOriginIsolated) { wasm.numThreads = 1; return; }
-      const cores = navigator.hardwareConcurrency || 4;
-      // WebGPU runs most ops on the GPU; only a few shape/control ops fall back
-      // to WASM. Whisper decodes autoregressively (many tiny CPU ops per token),
-      // so any thread pool just adds per-op SharedArrayBuffer barrier-sync
-      // overhead — and on Apple Silicon those barriers stall fast P-cores waiting
-      // on E-cores. So keep WebGPU single-threaded (matches the previously fast
-      // baseline). For pure WASM, use a capped pool: a real speedup without
-      // oversubscribing logical cores vs the main thread. Applies on the first
-      // run; changing device later may need a reload to fully resize the pool.
-      wasm.numThreads = pickDevice() === 'webgpu'
-        ? 1
-        : Math.max(1, Math.min(cores - 1, 8));
-    }
+    // Device-aware WASM thread count now lives in asr-worker.js (the worker owns
+    // the ONNX env). pickDevice() result is passed to the worker per run.
     function escapeHtml(value) {
       return value
         .replaceAll('&', '&amp;')
@@ -1356,49 +1329,7 @@
         return { ...seg, end };
       });
     }
-    function groupWordChunks(chunks) {
-      const rows = [];
-      let current = null;
-      let count = 0;
-      for (const chunk of chunks) {
-        const [start, end] = Array.isArray(chunk.timestamp) ? chunk.timestamp : [null, null];
-        const text = String(chunk.text || '').trim();
-        if (!Number.isFinite(start) || !text) continue;
-        if (!current) {
-          current = { start, end: Number.isFinite(end) ? end : start + 0.8, text };
-          count = 1;
-          continue;
-        }
-        current.end = Number.isFinite(end) ? end : current.end;
-        current.text += (text.startsWith("'") || text.startsWith(',') || text.startsWith('.') || text.startsWith('!') || text.startsWith('?') ? '' : ' ') + text;
-        count += 1;
-        const duration = current.end - current.start;
-        const shouldBreak = /[.!?…:]$/.test(text) || duration >= 6 || count >= 14;
-        if (shouldBreak) {
-          rows.push(current);
-          current = null;
-          count = 0;
-        }
-      }
-      if (current) rows.push(current);
-      return rows;
-    }
-    function outputToSegments(output, timestampMode) {
-      if (Array.isArray(output?.chunks) && output.chunks.length) {
-        if (timestampMode === 'word') {
-          return normalizeSegments(groupWordChunks(output.chunks));
-        }
-        return normalizeSegments(output.chunks.map(chunk => ({
-          start: Array.isArray(chunk.timestamp) ? chunk.timestamp[0] : 0,
-          end: Array.isArray(chunk.timestamp) ? chunk.timestamp[1] : null,
-          text: chunk.text,
-        })));
-      }
-      if (typeof output?.text === 'string' && output.text.trim()) {
-        return normalizeSegments([{ start: 0, end: audioEl.duration || 0, text: output.text.trim() }]);
-      }
-      return [];
-    }
+    // groupWordChunks / outputToSegments moved to asr-worker.js.
     function joinsWithoutLeadingSpace(text) {
       return text.startsWith("'") || text.startsWith(',') || text.startsWith('.') || text.startsWith('!') || text.startsWith('?');
     }
@@ -1462,29 +1393,16 @@
 
       return { changed: true, changedFrom };
     }
-    async function getTranscriber() {
-      const model = modelSelectEl.value;
-      const device = pickDevice();
-      const dtype = dtypeSelectEl.value;
-      const key = `${model}__${device}__${dtype}`;
-      if (transcriber && currentKey === key) return transcriber;
-      setStatus(`Loading ${model} on ${device} (${dtype})...`);
-      setProgress(0, 'Starting model download...');
-      transcriber = await pipeline('automatic-speech-recognition', model, {
-        device,
-        dtype,
-        progress_callback: (info) => {
-          if (info?.status === 'progress' && Number.isFinite(info.progress)) {
-            setProgress(info.progress, `Downloading ${info.file || 'model'} — ${Math.round(info.progress)}%`);
-          } else if (info?.status === 'done') {
-            setProgress(100, 'Model ready');
-          } else if (info?.status) {
-            progressLabelEl.textContent = `${info.status}${info.file ? ` — ${info.file}` : ''}`;
-          }
-        },
-      });
-      currentKey = key;
-      return transcriber;
+    // Mirror the transformers.js progress_callback into the UI. The worker
+    // forwards these events from its getTranscriber as model-progress messages.
+    function applyModelProgress(info) {
+      if (info?.status === 'progress' && Number.isFinite(info.progress)) {
+        setProgress(info.progress, `Downloading ${info.file || 'model'} — ${Math.round(info.progress)}%`);
+      } else if (info?.status === 'done') {
+        setProgress(100, 'Model ready');
+      } else if (info?.status) {
+        progressLabelEl.textContent = `${info.status}${info.file ? ` — ${info.file}` : ''}`;
+      }
     }
     function updateSegmentNodeContent(node, seg, index, totalSegments, rawQuery) {
       node.innerHTML = `<span class="segment-text">${highlightMatch(seg.text, rawQuery)}</span>`;
@@ -1670,45 +1588,45 @@
       const body = segments.map(seg => `${formatTime(seg.start, true)} --> ${formatTime(seg.end, true)}\n${seg.text}`).join('\n\n');
       return `WEBVTT\n\n${body}`;
     }
-    function getChunkWindows(totalSamples, chunkLengthSec, strideSec) {
-      const chunkSize = Math.max(1, Math.round(chunkLengthSec * TARGET_SAMPLE_RATE));
-      const overlap = Math.max(0, Math.round(strideSec * TARGET_SAMPLE_RATE));
-      const totalDuration = totalSamples / TARGET_SAMPLE_RATE;
-      const windows = [];
-      for (let start = 0; start < totalSamples; start += chunkSize) {
-        const centralStart = start / TARGET_SAMPLE_RATE;
-        const centralEnd = Math.min(totalDuration, centralStart + chunkLengthSec);
-        const windowStart = Math.max(0, Math.round(centralStart * TARGET_SAMPLE_RATE) - overlap);
-        const windowEnd = Math.min(
-          totalSamples,
-          Math.round(centralEnd * TARGET_SAMPLE_RATE) + overlap,
-        );
-        windows.push({
-          centralStart,
-          centralEnd,
-          windowStart,
-          windowStartSec: windowStart / TARGET_SAMPLE_RATE,
-          windowEndSec: windowEnd / TARGET_SAMPLE_RATE,
-          chunkAudio: audioData => audioData.subarray(windowStart, windowEnd),
-        });
+    // getChunkWindows / alignChunkSegments moved to asr-worker.js.
+    function getAsrWorker() {
+      if (!asrWorker) {
+        asrWorker = new Worker('./asr-worker.js', { type: 'module' });
       }
-      return windows;
+      return asrWorker;
     }
-    function alignChunkSegments(rawSegments, windowStartSec, centralStart, centralEnd) {
-      return rawSegments
-        .map(seg => ({
-          start: seg.start + windowStartSec,
-          end: seg.end + windowStartSec,
-          text: seg.text,
-        }))
-        .filter(seg => Number.isFinite(seg.start) && Number.isFinite(seg.end))
-        .filter(seg => seg.end > centralStart && seg.start < centralEnd)
-        .map(seg => ({
-          ...seg,
-          start: Math.max(seg.start, centralStart),
-          end: Math.min(seg.end, centralEnd),
-        }))
-        .filter(seg => seg.end > seg.start && seg.text);
+    // Drive one transcription in the worker. Resolves on 'done', rejects on
+    // 'error'. Streamed chunk/progress/debug events go to the handlers. The
+    // audio buffer is transferred (zero-copy), so the caller must not reuse it.
+    function runAsrInWorker(payload, handlers) {
+      return new Promise((resolve, reject) => {
+        const worker = getAsrWorker();
+        const onMessage = (event) => {
+          const msg = event.data;
+          if (!msg || msg.job !== payload.job) return; // ignore stale jobs
+          switch (msg.type) {
+            case 'model-progress': handlers.onModelProgress?.(msg.info); break;
+            case 'model-ready': handlers.onModelReady?.(); break;
+            case 'chunk': handlers.onChunk?.(msg); break;
+            case 'chunk-error': handlers.onChunkError?.(msg); break;
+            case 'debug': handlers.onDebug?.(msg.message); break;
+            case 'done': cleanup(); resolve(msg); break;
+            case 'cancelled': cleanup(); resolve(msg); break; // preempted/reset; caller's job guard returns
+            case 'error': cleanup(); reject(new Error(msg.message)); break;
+          }
+        };
+        const onError = (event) => {
+          cleanup();
+          reject(event.error || new Error(event.message || 'ASR worker error'));
+        };
+        function cleanup() {
+          worker.removeEventListener('message', onMessage);
+          worker.removeEventListener('error', onError);
+        }
+        worker.addEventListener('message', onMessage);
+        worker.addEventListener('error', onError);
+        worker.postMessage({ type: 'transcribe', ...payload }, [payload.audio.buffer]);
+      });
     }
     async function transcribeAudio() {
       const file = audioFileEl.files?.[0];
@@ -1724,6 +1642,7 @@
       const { chunkLength, strideLength } = chunkSettings;
       const timestampMode = timestampModeEl.value;
       const decodeStart = performance.now();
+      const debug = isDebugEnabled();
       debugSession = {
         job: localJob,
         startedAt: performance.now(),
@@ -1732,7 +1651,7 @@
         renderCount: 0,
       };
       clearDebugLog();
-      if (isDebugEnabled()) {
+      if (debug) {
         appendDebugLog(`session ${localJob} start`);
         appendDebugLog(`settings file=${file.name} model=${model} device=${device} dtype=${dtype} chunkLength=${chunkLength} stride=${strideLength} timestampMode=${timestampMode}`);
       }
@@ -1752,11 +1671,12 @@
       setProgress(0, 'Decoding audio...');
       modelLabelEl.textContent = `Model: ${model.split('/').pop()} | ${device} | ${dtype}`;
 
+      let failedChunks = 0;
       try {
         validateAudioDuration(audioEl.duration);
         const audioData = await decodeAudioFile(file, label => setProgress(0, label));
         debugSession.audioDecodeMs = performance.now() - decodeStart;
-        if (isDebugEnabled()) {
+        if (debug) {
           appendDebugLog(`audio decoded in ${toFixedOrZero(debugSession.audioDecodeMs)} ms (${audioData.length} samples, ${(audioData.length / TARGET_SAMPLE_RATE).toFixed(2)}s)`);
         }
         if (localJob !== jobNonce) return;
@@ -1765,66 +1685,48 @@
           setWarning('Quantized weights can still fail in some browsers. If session creation fails, switch back to fp32.');
         }
 
-        configureOnnxThreads();
-        const asr = await getTranscriber();
-        debugSession.modelLoadMs = performance.now() - (debugSession.startedAt || decodeStart);
-        if (isDebugEnabled()) {
-          appendDebugLog(`model ready in ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
-        }
-        if (localJob !== jobNonce) return;
-
-        setStatus('Running transcription...');
-        setProgress(0, 'Streaming chunks...');
-        const chunkWindows = getChunkWindows(audioData.length, chunkLength, strideLength);
-        const totalChunks = Math.max(1, chunkWindows.length);
-        let failedChunks = 0;
+        // Worker computes the chunk windows and runs ASR; we stream results in.
         streamActive = true;
         streamHorizonTime = 0;
         segments = [];
         renderTranscript();
-        for (let i = 0; i < totalChunks; i++) {
-          if (localJob !== jobNonce) return;
-          const chunkStart = performance.now();
-          const {
-            centralStart,
-            centralEnd,
-            windowStart,
-            windowStartSec,
-            chunkAudio,
-          } = chunkWindows[i];
-          streamHorizonTime = Math.max(streamHorizonTime, centralEnd);
-          if (isDebugEnabled()) {
-            appendDebugLog(`chunk ${i + 1}/${totalChunks}: window [${centralStart.toFixed(2)}, ${centralEnd.toFixed(2)}], strideWindowStart=${windowStartSec.toFixed(2)}`);
-          }
-          try {
-            const windowData = chunkAudio(audioData);
-            const asrStart = performance.now();
-            const output = await asr(windowData, {
-              return_timestamps: timestampMode === 'word' ? 'word' : true,
-            });
-            if (isDebugEnabled()) {
-              appendDebugLog(`chunk ${i + 1}/${totalChunks} ASR time ${toFixedOrZero(performance.now() - asrStart)} ms`);
-            }
-            if (localJob !== jobNonce) return;
-            const chunkSegments = alignChunkSegments(
-              outputToSegments(output, timestampMode),
-              windowStartSec,
-              centralStart,
-              centralEnd,
-            );
-            if (isDebugEnabled()) {
-              appendDebugLog(`chunk ${i + 1}/${totalChunks} aligned ${chunkSegments.length} segments`);
-            }
-            appendTranscriptData(chunkSegments, i + 1, totalChunks);
-            if (isDebugEnabled()) {
-              appendDebugLog(`chunk ${i + 1}/${totalChunks} loop wall time ${toFixedOrZero(performance.now() - chunkStart)} ms`);
-            }
-          } catch (err) {
-            failedChunks += 1;
-            console.error(err);
-            setWarning(`Chunk ${i + 1} of ${totalChunks} failed to transcribe. Continuing with remaining chunks.`);
-          }
-        }
+        setStatus(`Loading ${model} on ${device} (${dtype})...`);
+        setProgress(0, 'Starting model download...');
+
+        await runAsrInWorker(
+          {
+            job: localJob,
+            audio: audioData,
+            audioDuration: audioEl.duration,
+            model,
+            device,
+            dtype,
+            chunkLength,
+            strideLength,
+            timestampMode,
+            debug,
+          },
+          {
+            onModelProgress: applyModelProgress,
+            onModelReady: () => {
+              debugSession.modelLoadMs = performance.now() - (debugSession.startedAt || decodeStart);
+              if (debug) appendDebugLog(`model ready in ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
+              setStatus('Running transcription...');
+              setProgress(0, 'Streaming chunks...');
+            },
+            onChunk: ({ segments: chunkSegments, chunkIndex, totalChunks, centralEnd }) => {
+              if (localJob !== jobNonce) return;
+              streamHorizonTime = Math.max(streamHorizonTime, centralEnd);
+              appendTranscriptData(chunkSegments, chunkIndex, totalChunks);
+            },
+            onChunkError: ({ chunkIndex, totalChunks, message }) => {
+              failedChunks += 1;
+              console.error(`Chunk ${chunkIndex} failed: ${message}`);
+              setWarning(`Chunk ${chunkIndex} of ${totalChunks} failed to transcribe. Continuing with remaining chunks.`);
+            },
+            onDebug: (message) => { if (debug) appendDebugLog(message); },
+          },
+        );
         if (localJob !== jobNonce) return;
         if (!segments.length) throw new Error('Transcription finished, but no timestamped segments were returned.');
 
@@ -1838,7 +1740,7 @@
           setWarning(`${failedChunks} chunk${failedChunks === 1 ? '' : 's'} failed while transcribing.`);
         }
         setDownloadReady(true);
-        if (isDebugEnabled() && debugSession) {
+        if (debug && debugSession) {
           appendDebugLog(`session ${localJob} completed in ${toFixedOrZero(performance.now() - debugSession.startedAt)} ms`);
           appendDebugLog(`render passes: ${debugSession.renderCount || 0}, decode ${toFixedOrZero(debugSession.audioDecodeMs)} ms, model ${toFixedOrZero(debugSession.modelLoadMs)} ms`);
         }
@@ -1853,17 +1755,24 @@
         setStatus('Transcription did not complete.');
         setIdleProgress('Failed');
         setDownloadReady(false);
-        if (isDebugEnabled() && debugSession) {
+        if (debug && debugSession) {
           appendDebugLog(`session ${localJob} failed after ${toFixedOrZero(performance.now() - debugSession.startedAt)} ms: ${message}`);
         }
       } finally {
-        streamActive = false;
-        streamHorizonTime = 0;
-        if (localJob === jobNonce) setBusy(false);
+        // Only the current job owns shared streaming state — a cancelled/stale
+        // job must not clobber a newer one's flags.
+        if (localJob === jobNonce) {
+          streamActive = false;
+          streamHorizonTime = 0;
+          setBusy(false);
+        }
       }
     }
     function resetAll() {
       jobNonce += 1;
+      if (asrWorker) asrWorker.postMessage({ type: 'cancel' });
+      streamActive = false;
+      streamHorizonTime = 0;
       setBusy(false);
       debugSession = null;
       clearDebugLog();
@@ -1977,7 +1886,6 @@
       closeTtsVoiceMenu(true);
     });
 
-    configureOnnxThreads();
     loadSavedTheme();
     renderTtsReadingView(ttsTextEl.value);
     updateTtsRangeLabels();
