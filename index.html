@@ -745,7 +745,7 @@
       return ttsEngine === 'local' ? true : canUseSpeechSynthesis();
     }
     function pickTtsDevice() {
-      return navigator.gpu ? 'webgpu' : 'wasm';
+      return 'wasm';
     }
     function pickTtsDtype(device) {
       return device === 'webgpu' ? 'fp32' : 'q8';
