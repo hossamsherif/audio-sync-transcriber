@@ -697,7 +697,6 @@
     let ttsLocalStartCtxTime = 0;
     let ttsLocalDurationMs = 0;
     const KOKORO_MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
-    const KOKORO_DTYPE = 'q8';
     // Curated subset of Kokoro voices, shaped to reuse the existing voice picker.
     const KOKORO_VOICES = [
       { voiceURI: 'af_heart', name: 'Heart — American female', lang: 'en-US' },
@@ -747,6 +746,9 @@
     }
     function pickTtsDevice() {
       return navigator.gpu ? 'webgpu' : 'wasm';
+    }
+    function pickTtsDtype(device) {
+      return device === 'webgpu' ? 'fp32' : 'q8';
     }
     function getTtsWorker() {
       if (!ttsWorker) {
@@ -1195,6 +1197,7 @@
       };
       function cleanup() { worker.removeEventListener('message', onMessage); }
       worker.addEventListener('message', onMessage);
+      const ttsDevice = pickTtsDevice();
       worker.postMessage({
         type: 'generate',
         id: speakId,
@@ -1202,8 +1205,8 @@
         voice: voice.voiceURI,
         speed: getTtsRate(),
         model: KOKORO_MODEL,
-        device: pickTtsDevice(),
-        dtype: KOKORO_DTYPE,
+        device: ttsDevice,
+        dtype: pickTtsDtype(ttsDevice),
       });
     }
     // Engine-aware entry point used by the Read buttons.
