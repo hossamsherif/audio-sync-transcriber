@@ -525,6 +525,16 @@
               <div class="hint">Local neural runs a Kokoro voice fully in your browser — nothing is sent to a server. Browser voices use the Web Speech API, whose higher-quality voices may be synthesized in the cloud. The Kokoro model downloads once on first use, then is cached.</div>
             </div>
 
+            <div id="ttsDeviceRow">
+              <label for="ttsDeviceSelect">Compute</label>
+              <select id="ttsDeviceSelect">
+                <option value="auto">Auto (GPU if available)</option>
+                <option value="webgpu">WebGPU (fastest)</option>
+                <option value="wasm">CPU / WASM (most compatible)</option>
+              </select>
+              <div class="hint">Local neural only. Auto uses your GPU via WebGPU when present. If audio comes out as noise or static — a known issue on some newer GPUs — switch to CPU / WASM for correct (slower) output.</div>
+            </div>
+
             <div>
               <label for="ttsVoiceTriggerBtn">Browser voice</label>
               <div class="tts-voice-tools">
@@ -643,6 +653,8 @@
     const ttsTextEl = document.getElementById('ttsText');
     const ttsReadingViewEl = document.getElementById('ttsReadingView');
     const ttsEngineSelectEl = document.getElementById('ttsEngineSelect');
+    const ttsDeviceRowEl = document.getElementById('ttsDeviceRow');
+    const ttsDeviceSelectEl = document.getElementById('ttsDeviceSelect');
     const ttsVoiceTriggerBtn = document.getElementById('ttsVoiceTriggerBtn');
     const ttsVoiceTriggerTextEl = document.getElementById('ttsVoiceTriggerText');
     const ttsVoiceMenuEl = document.getElementById('ttsVoiceMenu');
@@ -745,6 +757,8 @@
       return ttsEngine === 'local' ? true : canUseSpeechSynthesis();
     }
     function pickTtsDevice() {
+      const choice = ttsDeviceSelectEl?.value || 'auto';
+      if (choice === 'webgpu' || choice === 'wasm') return choice;
       return navigator.gpu ? 'webgpu' : 'wasm';
     }
     function pickTtsDtype(device) {
@@ -982,6 +996,9 @@
       ttsPauseResumeBtn.textContent = ttsPaused ? 'Resume' : 'Pause';
       ttsVoiceTriggerBtn.disabled = !supported || !ttsVoices.length;
       ttsReloadVoicesBtn.disabled = !supported;
+      // Compute backend is local-engine-only; hide it for browser voices.
+      if (ttsDeviceRowEl) ttsDeviceRowEl.hidden = ttsEngine !== 'local';
+      if (ttsDeviceSelectEl) ttsDeviceSelectEl.disabled = ttsSpeaking;
       if ((!supported || !ttsVoices.length) && ttsVoiceMenuEl && !ttsVoiceMenuEl.hidden) closeTtsVoiceMenu(true);
     }
     function renderTtsVoiceOptions() {

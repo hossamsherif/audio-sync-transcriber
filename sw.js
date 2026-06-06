@@ -18,7 +18,7 @@
  *     here: transformers.js already persists them via `env.useBrowserCache`.
  */
 
-const CACHE_VERSION = 'bas-v2';
+const CACHE_VERSION = 'bas-v3';
 const APP_SHELL = ['./', './index.html'];
 
 // Cross-origin hosts whose responses we cache at runtime (library + wasm).

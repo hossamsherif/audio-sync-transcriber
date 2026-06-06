@@ -12,7 +12,29 @@
  * (sw.js), so multi-threaded WASM is available.
  */
 
-import { KokoroTTS } from 'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm';
+import { KokoroTTS, env } from 'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm';
+
+// kokoro-js re-exports the same transformers.js `env` it uses internally, so we
+// can tune its ONNX backend here. Mirror asr-worker.js: enable SIMD and, when
+// cross-origin isolated (we are, via sw.js), give pure-WASM runs a real thread
+// pool. Without this the WASM backend runs single-threaded — many times slower,
+// which matters because WASM is the only correct path on GPUs whose WebGPU
+// backend produces garbage audio (e.g. some brand-new AMD/RDNA parts).
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.simd = true;
+}
+
+// Must be set before the ONNX backend is first created (the pool size is read at
+// init). WebGPU runs ops on the GPU, so a WASM thread pool would only add
+// per-op barrier-sync overhead there — keep it single-threaded; for pure WASM
+// use a capped pool without oversubscribing logical cores.
+function configureOnnxThreads(device) {
+  const wasm = env.backends?.onnx?.wasm;
+  if (!wasm) return;
+  if (!self.crossOriginIsolated) { wasm.numThreads = 1; return; }
+  const cores = navigator.hardwareConcurrency || 4;
+  wasm.numThreads = device === 'webgpu' ? 1 : Math.max(1, Math.min(cores - 1, 8));
+}
 
 let kokoro = null;
 let currentKey = null;
@@ -27,6 +49,7 @@ function post(id, message, transfer) {
 async function getKokoro(id, model, device, dtype) {
   const key = `${model}__${device}__${dtype}`;
   if (kokoro && currentKey === key) return kokoro;
+  configureOnnxThreads(device);
   kokoro = await KokoroTTS.from_pretrained(model, {
     dtype,
     device,
